@@ -813,20 +813,50 @@ function processarArquivo(file, onDone) {
       r.onload = ev => {
         try {
           const wb = XLSX.read(ev.target.result, { type: 'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]]; // primeira aba
-          // Converte para array de arrays
-          const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-          if (!aoa || aoa.length < 2) { showToast('Planilha vazia ou inválida', 'error'); return; }
-          // Primeira linha = cabeçalhos
-          csvHeaders = aoa[0].map(h => String(h).trim());
+
+          // Tenta todas as abas — usa a que tiver mais dados
+          let melhorAba = null, melhorAoa = null, melhorLinhas = 0;
+          wb.SheetNames.forEach(nome => {
+            const ws = wb.Sheets[nome];
+            const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            const linhasComDados = aoa.filter(r => r.some(c => String(c).trim() !== '')).length;
+            if (linhasComDados > melhorLinhas) {
+              melhorLinhas = linhasComDados; melhorAoa = aoa; melhorAba = nome;
+            }
+          });
+
+          if (!melhorAoa || melhorLinhas < 2) {
+            showToast('Planilha vazia ou sem dados reconhecíveis', 'error'); return;
+          }
+
+          const aoa = melhorAoa;
+
+          // Detecta a linha do cabeçalho:
+          // Shopee/ML às vezes tem título na linha 1 e cabeçalho real mais abaixo.
+          // Procura a primeira linha que tenha >= 3 células não-vazias e não seja só números.
+          let headerRow = 0;
+          for (let i = 0; i < Math.min(aoa.length, 10); i++) {
+            const row = aoa[i];
+            const naoVazias = row.filter(c => String(c).trim() !== '');
+            const temTexto  = naoVazias.some(c => isNaN(Number(c)) && String(c).trim().length > 1);
+            if (naoVazias.length >= 3 && temTexto) { headerRow = i; break; }
+          }
+
+          csvHeaders = aoa[headerRow].map(h => String(h).trim()).filter(h => h !== '');
+          const numCols = csvHeaders.length;
           csvRows = [];
-          for (let i = 1; i < aoa.length; i++) {
-            const vals = aoa[i];
+          for (let i = headerRow + 1; i < aoa.length; i++) {
+            const vals = aoa[i].slice(0, numCols);
             if (vals.every(v => String(v).trim() === '')) continue;
             const obj = {};
             csvHeaders.forEach((h, idx) => { obj[h] = String(vals[idx] ?? '').trim(); });
             csvRows.push(obj);
           }
+
+          if (csvRows.length === 0) {
+            showToast(`Nenhuma linha de dados encontrada (aba: ${melhorAba})`, 'error'); return;
+          }
+
           const auto = autoMapear();
           if (CAMPOS.every(c => auto[c.key])) { colMap = auto; finalizarImport(); }
           else abrirModal(auto);
