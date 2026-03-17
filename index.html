@@ -582,7 +582,10 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
         <div class="card-title">📋 Inspeções registradas</div>
         <div class="card-sub" id="histSub">0 registros</div>
       </div>
-      <button class="btn-ghost" onclick="sincronizarHistorico()">☁ Sync</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn-ghost" onclick="sincronizarHistorico()">☁ Sync</button>
+        <button class="btn-ghost" onclick="testarConexao()" id="btnPing" style="font-size:11px;padding:6px 10px" title="Testar conexão com a planilha">🔌 Testar</button>
+      </div>
     </div>
     <div id="historicoList">
       <div class="empty-state"><div class="empty-icon">📭</div><div>Nenhuma inspeção ainda</div></div>
@@ -1943,6 +1946,47 @@ async function salvarInspecaoInspetor() {
     const modeBtn = document.getElementById('modeBtnCamIns');
     if (modeBtn) setModeInspetor('camera', modeBtn);
   }, 1200);
+}
+
+
+// ═══════════════════════════════════════════
+// DIAGNÓSTICO DE CONEXÃO
+// ═══════════════════════════════════════════
+async function testarConexao() {
+  const btn = document.getElementById('btnPing');
+  btn.textContent = '⟳ Testando...';
+  btn.disabled = true;
+  try {
+    const res = await jsonpRequest({ action: 'ping' });
+    if (res && res.ok) {
+      showToast('✓ Planilha conectada — deploy v' + (res.versao||'?'), 'success');
+      btn.textContent = '✓ OK';
+      btn.style.color = 'var(--green)';
+    } else if (res && res.erro) {
+      // Conseguiu conectar mas ação não existe — deploy desatualizado
+      showToast('⚠️ Deploy DESATUALIZADO — cole o Sheets.gs novo e publique nova versão', 'error');
+      btn.textContent = '⚠️ Deploy antigo';
+      btn.style.color = 'var(--orange)';
+    } else {
+      showToast('Resposta inesperada da planilha', 'error');
+      btn.textContent = '? Resposta estranha';
+    }
+  } catch(e) {
+    if (e.message === 'Timeout') {
+      showToast('⏱ Timeout — planilha não responde. Verifique se o deploy está publicado como "Qualquer pessoa"', 'error');
+      btn.textContent = '⏱ Timeout';
+    } else {
+      showToast('❌ Sem conexão — verifique a internet', 'error');
+      btn.textContent = '❌ Sem conexão';
+    }
+    btn.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => {
+      btn.textContent = '🔌 Testar';
+      btn.style.color = '';
+    }, 5000);
+  }
 }
 
 // TOAST
