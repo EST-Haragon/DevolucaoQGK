@@ -876,7 +876,18 @@ function processarArquivo(file, onDone) {
           }
 
           if (csvRows.length === 0) {
-            showToast('Nenhuma linha de dados. Cabeçalho detectado na linha ' + (headerRow+1), 'error');
+            // Diagnóstico: mostra o que o SheetJS leu nas primeiras linhas
+            let diag = 'Aba: ' + melhorAba + ' | ' + aoa.length + ' linhas brutas\n';
+            diag += 'Linha detectada como cabeçalho: ' + (headerRow+1) + '\n';
+            diag += 'Colunas do cabeçalho (' + csvHeaders.length + '): ' + csvHeaders.slice(0,5).join(' | ') + '\n';
+            diag += 'Linhas após cabeçalho com dados: ';
+            let comDados = 0;
+            for (let i = headerRow+1; i < aoa.length; i++) {
+              if (aoa[i] && aoa[i].some(v => String(v??'').trim() !== '')) comDados++;
+            }
+            diag += comDados;
+            console.warn('DIAG XLSX:', diag);
+            alert('Diagnóstico do arquivo:\n\n' + diag + '\n\nVerifique o console (F12) para mais detalhes.');
             return;
           }
 
