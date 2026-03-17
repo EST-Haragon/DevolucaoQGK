@@ -428,8 +428,8 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
     <div class="drop-zone" id="dropZone" onclick="document.getElementById('csvInput').click()">
       <div class="drop-zone-icon">📄</div>
       <div class="drop-zone-text">Clique ou arraste o CSV aqui</div>
-      <div class="drop-zone-sub" id="dropSub">Painel de devoluções → Mercado Livre</div>
-      <input type="file" id="csvInput" accept=".csv,.txt" style="display:none" onchange="handleFileSelect(event)">
+      <div class="drop-zone-sub" id="dropSub">CSV ou Excel (.xlsx) exportado da plataforma</div>
+      <input type="file" id="csvInput" accept=".csv,.txt,.xlsx,.xls" style="display:none" onchange="handleFileSelect(event)">
     </div>
     <div class="stats-row" id="importStats" style="display:none">
       <div class="stat-mini"><div class="stat-mini-val" id="statTotal">0</div><div class="stat-mini-label">Pedidos</div></div>
@@ -736,8 +736,52 @@ function handleFileSelect(e) { const f = e.target.files[0]; if (f) processarArqu
 
 function processarArquivo(file) {
   if (!file) return;
-  new FileReader().onload = ev => parsearCSV(ev.target.result);
-  const r = new FileReader(); r.onload = ev => parsearCSV(ev.target.result); r.readAsText(file, 'UTF-8');
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'xlsx' || ext === 'xls') {
+    // Arquivo Excel — usa SheetJS
+    carregarSheetJS(() => {
+      const r = new FileReader();
+      r.onload = ev => {
+        try {
+          const wb = XLSX.read(ev.target.result, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]]; // primeira aba
+          // Converte para array de arrays
+          const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          if (!aoa || aoa.length < 2) { showToast('Planilha vazia ou inválida', 'error'); return; }
+          // Primeira linha = cabeçalhos
+          csvHeaders = aoa[0].map(h => String(h).trim());
+          csvRows = [];
+          for (let i = 1; i < aoa.length; i++) {
+            const vals = aoa[i];
+            if (vals.every(v => String(v).trim() === '')) continue;
+            const obj = {};
+            csvHeaders.forEach((h, idx) => { obj[h] = String(vals[idx] ?? '').trim(); });
+            csvRows.push(obj);
+          }
+          const auto = autoMapear();
+          if (CAMPOS.every(c => auto[c.key])) { colMap = auto; finalizarImport(); }
+          else abrirModal(auto);
+        } catch(e) {
+          showToast('Erro ao ler o arquivo Excel: ' + e.message, 'error');
+        }
+      };
+      r.readAsArrayBuffer(file);
+    });
+  } else {
+    // CSV / TXT — leitura como texto
+    const r = new FileReader();
+    r.onload = ev => parsearCSV(ev.target.result);
+    r.readAsText(file, 'UTF-8');
+  }
+}
+
+function carregarSheetJS(cb) {
+  if (window.XLSX) { cb(); return; }
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.onload = cb;
+  s.onerror = () => showToast('Erro ao carregar suporte a Excel', 'error');
+  document.head.appendChild(s);
 }
 
 function parsearCSV(texto) {
