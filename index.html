@@ -864,7 +864,7 @@ function processarArquivo(file, onDone) {
           });
 
           const numCols = csvHeaders.length;
-          csvRows = [];
+          const _rowsTemp = [];
           for (let i = headerRow + 1; i < aoa.length; i++) {
             const vals = aoa[i];
             if (!vals || vals.every(v => String(v ?? '').trim() === '')) continue;
@@ -872,28 +872,27 @@ function processarArquivo(file, onDone) {
             csvHeaders.forEach((h, idx) => {
               obj[h] = String(vals[idx] ?? '').trim();
             });
-            csvRows.push(obj);
+            _rowsTemp.push(obj);
           }
 
-          if (csvRows.length === 0) {
-            // Diagnóstico: mostra o que o SheetJS leu nas primeiras linhas
+          if (_rowsTemp.length === 0) {
             let diag = 'Aba: ' + melhorAba + ' | ' + aoa.length + ' linhas brutas\n';
-            diag += 'Linha detectada como cabeçalho: ' + (headerRow+1) + '\n';
-            diag += 'Colunas do cabeçalho (' + csvHeaders.length + '): ' + csvHeaders.slice(0,5).join(' | ') + '\n';
-            diag += 'Linhas após cabeçalho com dados: ';
+            diag += 'Cabeçalho detectado na linha: ' + (headerRow+1) + '\n';
+            diag += 'Colunas (' + csvHeaders.length + '): ' + csvHeaders.slice(0,5).join(' | ') + '\n';
             let comDados = 0;
             for (let i = headerRow+1; i < aoa.length; i++) {
               if (aoa[i] && aoa[i].some(v => String(v??'').trim() !== '')) comDados++;
             }
-            diag += comDados;
+            diag += 'Linhas com dados após cabeçalho: ' + comDados;
             console.warn('DIAG XLSX:', diag);
-            alert('Diagnóstico do arquivo:\n\n' + diag + '\n\nVerifique o console (F12) para mais detalhes.');
+            showToast('0 pedidos lidos. Veja console (F12) para detalhes.', 'error');
+            alert('Diagnóstico:\n\n' + diag);
             return;
           }
 
           const auto = autoMapear();
-          if (CAMPOS.every(c => auto[c.key])) { colMap = auto; finalizarImport(); }
-          else abrirModal(auto);
+          if (CAMPOS.every(c => auto[c.key])) { colMap = auto; finalizarImport(_rowsTemp); }
+          else abrirModal(auto, _rowsTemp);
         } catch(e) {
           showToast('Erro ao ler o arquivo Excel: ' + e.message, 'error');
         }
@@ -924,15 +923,15 @@ function parsearCSV(texto) {
   if (linhas.length < 2) { showToast('CSV vazio ou inválido', 'error'); return; }
   linhas[0] = linhas[0].replace(/^\uFEFF/,'');
   csvHeaders = parseCSVLine(linhas[0], delim).map(h => h.trim().replace(/"/g,''));
-  csvRows = [];
+  const _rowsTemp = [];
   for (let i = 1; i < linhas.length; i++) {
     const vals = parseCSVLine(linhas[i], delim).map(v => v.trim().replace(/^"|"$/g,''));
     if (vals.every(v => v === '')) continue;
-    const obj = {}; csvHeaders.forEach((h, idx) => { obj[h] = vals[idx]||''; }); csvRows.push(obj);
+    const obj = {}; csvHeaders.forEach((h, idx) => { obj[h] = vals[idx]||''; }); _rowsTemp.push(obj);
   }
   const auto = autoMapear();
-  if (CAMPOS.every(c => auto[c.key])) { colMap = auto; finalizarImport(); }
-  else abrirModal(auto);
+  if (CAMPOS.every(c => auto[c.key])) { colMap = auto; finalizarImport(_rowsTemp); }
+  else abrirModal(auto, _rowsTemp);
 }
 
 function parseCSVLine(l, d) {
@@ -951,7 +950,9 @@ function autoMapear() {
   return map;
 }
 
-function abrirModal(auto) {
+let _rowsPendenteMapeamento = [];
+function abrirModal(auto, rows) {
+  _rowsPendenteMapeamento = rows || [];
   document.getElementById('colMapGrid').innerHTML = CAMPOS.map(c => `
     <div class="col-row">
       <div class="col-key">${c.label}</div>
@@ -967,19 +968,19 @@ function confirmarMapeamento() {
   colMap = {};
   CAMPOS.forEach(c => { const v = document.getElementById('map_'+c.key)?.value; if(v) colMap[c.key]=v; });
   if (!colMap.pedido && !colMap.produto) { showToast('Mapeie pelo menos o código do pedido', 'error'); return; }
-  fecharModal(); finalizarImport();
+  fecharModal(); finalizarImport(_rowsPendenteMapeamento);
 }
 
 function fecharModal() { document.getElementById('modalColunas').classList.remove('open'); }
 
-function finalizarImport() {
-  // Cria nova fonte com os dados atuais
+function finalizarImport(rows) {
+  // Cria nova fonte com os dados passados
   const pend = _arquivoPendente;
   const novaFonte = {
     id:     Date.now(),
     nome:   pend?.file?.name || 'Importação',
     source: importSource,
-    rows:   [...csvRows],  // snapshot das linhas atuais
+    rows:   rows || [],
     colMap: { ...colMap },
   };
   fontes.push(novaFonte);
