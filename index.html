@@ -852,7 +852,7 @@ function pararCamera() {
 
 function iniciarLeituraQR(v) {
   if ('BarcodeDetector' in window) {
-    const det = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13']});
+    const det = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','itf']});
     scanInterval = setInterval(async()=>{ if(v.readyState!==4)return; try{const b=await det.detect(v);if(b.length)processarCodigo(b[0].rawValue);}catch{} },400);
   } else {
     const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.20.0/index.min.js';
@@ -1597,7 +1597,7 @@ function pararCameraInspetor() {
 
 function iniciarLeituraQRIns(v) {
   if ('BarcodeDetector' in window) {
-    const det = new BarcodeDetector({ formats: ['qr_code','code_128','code_39','ean_13'] });
+    const det = new BarcodeDetector({ formats: ['qr_code','code_128','code_39','ean_13','ean_8','itf'] });
     scanIntervalIns = setInterval(async () => {
       if (v.readyState !== 4) return;
       try { const b = await det.detect(v); if (b.length) processarCodigoIns(b[0].rawValue); } catch {}
