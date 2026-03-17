@@ -741,10 +741,16 @@ function iniciarApp() {
       iniciarModo('manual');
     }
   }
+  // Bloqueia o browser de abrir/baixar o arquivo se solto fora da drop zone
+  document.addEventListener('dragover',  e => e.preventDefault());
+  document.addEventListener('drop',      e => e.preventDefault());
+  document.addEventListener('dragenter', e => e.preventDefault());
+
   const dz = document.getElementById('dropZone');
-  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); processarArquivos(Array.from(e.dataTransfer.files)); });
+  dz.addEventListener('dragover',  e => { e.preventDefault(); e.stopPropagation(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragenter', e => { e.preventDefault(); e.stopPropagation(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', e => { e.stopPropagation(); dz.classList.remove('drag-over'); });
+  dz.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag-over'); processarArquivos(Array.from(e.dataTransfer.files)); });
   sincronizarHistorico();
   setTimeout(reenviarPendentes, 5000);
 }
