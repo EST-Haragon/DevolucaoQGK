@@ -703,13 +703,20 @@ let toggles = { correto: null, itens: null };
 let streamCam = null, scanInterval = null;
 
 const CAMPOS = [
-  { key:'pedido',    label:'Cód. Pedido / O.C',  hints:['pedido','order','codigo','número','numero','oc','compra','id'] },
-  { key:'produto',   label:'Nome do produto',      hints:['produto','titulo','item','descri','name','anuncio'] },
-  { key:'sku',       label:'SKU / Cód. interno',   hints:['sku','cod','referencia','codigo_item','variacao'] },
-  { key:'motivo',    label:'Motivo da devolução',  hints:['motivo','reason','causa','tipo','devolucao'] },
-  { key:'comprador', label:'Comprador',             hints:['comprador','buyer','cliente','usuario','nome_'] },
-  { key:'loja',      label:'Loja / Conta',          hints:['loja','conta','store','vendedor','seller'] },
-  { key:'data',      label:'Data',                  hints:['data','date','criado','abertura','solicitacao'] },
+  { key:'pedido',    label:'Cód. Pedido / O.C',
+    hints:['id do pedido','order id','numero do pedido','pedido','order','codigo','numero','oc','compra'] },
+  { key:'produto',   label:'Nome do produto',
+    hints:['nome do produto','product name','titulo','item','descri','nome_prod','anuncio','name'] },
+  { key:'sku',       label:'SKU / Cód. interno',
+    hints:['nº de referência do sku','sku principal','referencia do sku','sku','cod','referencia','codigo_item','variacao'] },
+  { key:'motivo',    label:'Motivo da devolução',
+    hints:['status da devolucao','cancelar motivo','motivo','reason','causa','devolucao','reembolso'] },
+  { key:'comprador', label:'Comprador',
+    hints:['nome de usuario (comprador)','nome do comprador','username','comprador','buyer','cliente','usuario'] },
+  { key:'loja',      label:'Loja / Conta',
+    hints:['nome da loja','loja','conta','store','seller name','canal'] },
+  { key:'data',      label:'Data',
+    hints:['data de criacao do pedido','hora completa do pedido','data','date','criado','abertura','pedido em'] },
 ];
 
 // INIT
@@ -812,49 +819,65 @@ function processarArquivo(file, onDone) {
       const r = new FileReader();
       r.onload = ev => {
         try {
-          const wb = XLSX.read(ev.target.result, { type: 'array' });
+          // Lê com cellDates e raw:false para melhor compatibilidade com Shopee/ML
+          const wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true, raw: false });
 
-          // Tenta todas as abas — usa a que tiver mais dados
-          let melhorAba = null, melhorAoa = null, melhorLinhas = 0;
+          // Tenta todas as abas — usa a que tiver mais colunas preenchidas no cabeçalho
+          let melhorAba = null, melhorWs = null, melhorCols = 0;
           wb.SheetNames.forEach(nome => {
             const ws = wb.Sheets[nome];
-            const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-            const linhasComDados = aoa.filter(r => r.some(c => String(c).trim() !== '')).length;
-            if (linhasComDados > melhorLinhas) {
-              melhorLinhas = linhasComDados; melhorAoa = aoa; melhorAba = nome;
-            }
+            const ref = ws['!ref'];
+            if (!ref) return;
+            const range = XLSX.utils.decode_range(ref);
+            if (range.e.c > melhorCols) { melhorCols = range.e.c; melhorWs = ws; melhorAba = nome; }
           });
 
-          if (!melhorAoa || melhorLinhas < 2) {
-            showToast('Planilha vazia ou sem dados reconhecíveis', 'error'); return;
-          }
+          if (!melhorWs) { showToast('Planilha vazia', 'error'); return; }
 
-          const aoa = melhorAoa;
+          // Usa sheet_to_json com header:1 para obter array de arrays
+          // dense:false garante que células mescladas sejam expandidas corretamente
+          const aoa = XLSX.utils.sheet_to_json(melhorWs, {
+            header: 1, defval: '', blankrows: false, raw: false
+          });
 
-          // Detecta a linha do cabeçalho:
-          // Shopee/ML às vezes tem título na linha 1 e cabeçalho real mais abaixo.
-          // Procura a primeira linha que tenha >= 3 células não-vazias e não seja só números.
-          let headerRow = 0;
+          if (!aoa || aoa.length < 2) { showToast('Planilha sem dados', 'error'); return; }
+
+          // Detecta a linha real do cabeçalho:
+          // A Shopee exporta com a linha 1 tendo apenas "ID do pedido" em célula mesclada
+          // ocupando todas as colunas — mas o SheetJS não expande isso, então parece ter
+          // só 1 coluna. A linha de cabeçalho real tem MUITAS colunas.
+          // Estratégia: usa a linha com MAIS colunas não-vazias nas primeiras 10 linhas.
+          let headerRow = 0, maxCols = 0;
           for (let i = 0; i < Math.min(aoa.length, 10); i++) {
-            const row = aoa[i];
-            const naoVazias = row.filter(c => String(c).trim() !== '');
-            const temTexto  = naoVazias.some(c => isNaN(Number(c)) && String(c).trim().length > 1);
-            if (naoVazias.length >= 3 && temTexto) { headerRow = i; break; }
+            const naoVazias = aoa[i].filter(c => String(c ?? '').trim() !== '').length;
+            if (naoVazias > maxCols) { maxCols = naoVazias; headerRow = i; }
           }
 
-          csvHeaders = aoa[headerRow].map(h => String(h).trim()).filter(h => h !== '');
+          // Pega cabeçalhos da linha detectada (ignora colunas totalmente vazias no meio)
+          const headersRaw = aoa[headerRow].map(h => String(h ?? '').trim());
+          // Remove colunas duplicadas adicionando sufixo
+          const seen = {};
+          csvHeaders = headersRaw.map(h => {
+            if (!h) return '_vazio_';
+            if (seen[h] === undefined) { seen[h] = 0; return h; }
+            seen[h]++; return h + '_' + seen[h];
+          });
+
           const numCols = csvHeaders.length;
           csvRows = [];
           for (let i = headerRow + 1; i < aoa.length; i++) {
-            const vals = aoa[i].slice(0, numCols);
-            if (vals.every(v => String(v).trim() === '')) continue;
+            const vals = aoa[i];
+            if (!vals || vals.every(v => String(v ?? '').trim() === '')) continue;
             const obj = {};
-            csvHeaders.forEach((h, idx) => { obj[h] = String(vals[idx] ?? '').trim(); });
+            csvHeaders.forEach((h, idx) => {
+              obj[h] = String(vals[idx] ?? '').trim();
+            });
             csvRows.push(obj);
           }
 
           if (csvRows.length === 0) {
-            showToast(`Nenhuma linha de dados encontrada (aba: ${melhorAba})`, 'error'); return;
+            showToast('Nenhuma linha de dados. Cabeçalho detectado na linha ' + (headerRow+1), 'error');
+            return;
           }
 
           const auto = autoMapear();
