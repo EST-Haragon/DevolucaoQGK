@@ -311,6 +311,23 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
 .topbar-perfil-dot.importadora { background: var(--blue); }
 .topbar-perfil-dot.inspetor { background: var(--green); }
 
+
+/* FONTES IMPORTADAS */
+.fontes-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.fonte-chip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.fonte-chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.fonte-chip-dot.ml     { background: var(--blue); }
+.fonte-chip-dot.shopee { background: var(--orange); }
+.fonte-chip-info { flex: 1; min-width: 0; }
+.fonte-chip-nome { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fonte-chip-meta { font-size: 10px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 1px; }
+.fonte-chip-remove { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border2); background: white; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--red); transition: background 0.12s; }
+.fonte-chip-remove:hover { background: var(--red-bg); }
+
 </style>
 </head>
 <body>
@@ -416,10 +433,9 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
   <div class="card" id="cardImport">
     <div class="card-header">
       <div>
-        <div class="card-title">📂 Importar relatório</div>
-        <div class="card-sub">CSV exportado da plataforma</div>
+        <div class="card-title">📂 Importar relatórios</div>
+        <div class="card-sub">Adicione um ou mais arquivos — CSV ou Excel</div>
       </div>
-      <button class="btn-ghost" id="btnTrocar" style="display:none" onclick="document.getElementById('csvInput').click()">↺ Trocar</button>
     </div>
     <div class="tab-row">
       <button class="tab-btn active" onclick="setImportSource('ml',this)">Mercado Livre</button>
@@ -427,14 +443,17 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
     </div>
     <div class="drop-zone" id="dropZone" onclick="document.getElementById('csvInput').click()">
       <div class="drop-zone-icon">📄</div>
-      <div class="drop-zone-text">Clique ou arraste o CSV aqui</div>
-      <div class="drop-zone-sub" id="dropSub">CSV ou Excel (.xlsx) exportado da plataforma</div>
-      <input type="file" id="csvInput" accept=".csv,.txt,.xlsx,.xls" style="display:none" onchange="handleFileSelect(event)">
+      <div class="drop-zone-text">Clique ou arraste arquivos aqui</div>
+      <div class="drop-zone-sub" id="dropSub">CSV ou Excel (.xlsx) — múltiplos arquivos aceitos</div>
+      <input type="file" id="csvInput" accept=".csv,.txt,.xlsx,.xls" multiple style="display:none" onchange="handleFileSelect(event)">
     </div>
+    <!-- Lista de fontes importadas -->
+    <div class="fontes-list" id="fontesList" style="display:none"></div>
+    <!-- Stats totais -->
     <div class="stats-row" id="importStats" style="display:none">
-      <div class="stat-mini"><div class="stat-mini-val" id="statTotal">0</div><div class="stat-mini-label">Pedidos</div></div>
+      <div class="stat-mini"><div class="stat-mini-val" id="statTotal">0</div><div class="stat-mini-label">Total</div></div>
+      <div class="stat-mini"><div class="stat-mini-val" style="color:var(--blue)" id="statArquivos">0</div><div class="stat-mini-label">Arquivos</div></div>
       <div class="stat-mini"><div class="stat-mini-val" style="color:var(--red)" id="statMotivos">0</div><div class="stat-mini-label">Motivos</div></div>
-      <div class="stat-mini"><div class="stat-mini-val" style="color:var(--blue)" id="statLojas">0</div><div class="stat-mini-label">Lojas</div></div>
     </div>
     <div style="margin-top:12px;display:none" id="btnProximo">
       <button class="btn-primary" style="width:100%" onclick="irParaBusca()">Buscar pedido →</button>
@@ -667,7 +686,15 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz40__TuQkxlnywycf_uVjSl7Iq7MS05AHv69X05jLPTsiocJwyz_wPe234G0h_1xcU/exec';
 
-let importSource = 'ml', csvHeaders = [], csvRows = [], colMap = null;
+let importSource = 'ml', csvHeaders = [], colMap = null;
+// Multi-fonte: cada entrada é { id, nome, source, rows, colMap }
+let fontes = [];
+// csvRows é um getter virtual — achata todas as fontes para retrocompatibilidade
+// Use buscarEmFontes() para busca que respeita a origem
+Object.defineProperty(window, 'csvRows', {
+  get() { return fontes.flatMap(f => f.rows); },
+  configurable: true
+});
 let pedidoAtual = null, inspecoes = [], estadoFisico = null;
 let toggles = { correto: null, itens: null };
 let streamCam = null, scanInterval = null;
@@ -685,21 +712,39 @@ const CAMPOS = [
 // INIT
 function iniciarApp() {
   carregarHistorico(); renderHistorico();
-  const cc = localStorage.getItem('qgk_dev_csv');
-  const cm = localStorage.getItem('qgk_dev_colmap');
-  if (cc && cm) {
-    csvRows = JSON.parse(cc); colMap = JSON.parse(cm);
-    importSource = localStorage.getItem('qgk_dev_source') || 'ml';
-    atualizarBadgeCSV(); mostrarStatsImport(); setStep(2);
-    document.getElementById('cardBusca').style.display = 'block';
-    document.getElementById('btnProximo').style.display = 'block';
-    document.getElementById('btnTrocar').style.display = 'inline-flex';
-    iniciarModo('manual');
+  // Carrega fontes salvas
+  const fontesSalvas = localStorage.getItem('qgk_dev_fontes');
+  if (fontesSalvas) {
+    try {
+      fontes = JSON.parse(fontesSalvas);
+      if (fontes.length) {
+        renderFontesList();
+        atualizarBadgeCSV(); mostrarStatsImport(); setStep(2);
+        document.getElementById('cardBusca').style.display = 'block';
+        document.getElementById('btnProximo').style.display = 'block';
+        iniciarModo('manual');
+      }
+    } catch(e) { fontes = []; }
+  }
+  // Retrocompatibilidade: migra cache antigo
+  if (!fontes.length) {
+    const cc = localStorage.getItem('qgk_dev_csv');
+    const cm = localStorage.getItem('qgk_dev_colmap');
+    if (cc && cm) {
+      const rows = JSON.parse(cc);
+      const src  = localStorage.getItem('qgk_dev_source') || 'ml';
+      fontes = [{ id: Date.now(), nome: 'Importação anterior', source: src, rows, colMap: JSON.parse(cm) }];
+      salvarFontes();
+      renderFontesList(); atualizarBadgeCSV(); mostrarStatsImport(); setStep(2);
+      document.getElementById('cardBusca').style.display = 'block';
+      document.getElementById('btnProximo').style.display = 'block';
+      iniciarModo('manual');
+    }
   }
   const dz = document.getElementById('dropZone');
   dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
   dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); processarArquivo(e.dataTransfer.files[0]); });
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); processarArquivos(Array.from(e.dataTransfer.files)); });
   sincronizarHistorico();
   setTimeout(reenviarPendentes, 5000);
 }
@@ -732,10 +777,25 @@ function setImportSource(src, el) {
   document.getElementById('dropSub').textContent = src === 'ml' ? 'Painel de devoluções → Mercado Livre' : 'Painel de devoluções → Shopee';
 }
 
-function handleFileSelect(e) { const f = e.target.files[0]; if (f) processarArquivo(f); e.target.value = ''; }
+function handleFileSelect(e) {
+  const files = Array.from(e.target.files);
+  if (files.length) processarArquivos(files);
+  e.target.value = '';
+}
 
-function processarArquivo(file) {
-  if (!file) return;
+function processarArquivos(files) {
+  // Processa em sequência para não sobrecarregar
+  let i = 0;
+  function next() { if (i < files.length) processarArquivo(files[i++], next); }
+  next();
+}
+
+// arquivo pendente de mapeamento (aguardando modal)
+let _arquivoPendente = null;
+
+function processarArquivo(file, onDone) {
+  if (!file) { if(onDone)onDone(); return; }
+  _arquivoPendente = { file, onDone };
   const ext = file.name.split('.').pop().toLowerCase();
   if (ext === 'xlsx' || ext === 'xls') {
     // Arquivo Excel — usa SheetJS
@@ -840,27 +900,79 @@ function confirmarMapeamento() {
 function fecharModal() { document.getElementById('modalColunas').classList.remove('open'); }
 
 function finalizarImport() {
-  localStorage.setItem('qgk_dev_csv', JSON.stringify(csvRows));
-  localStorage.setItem('qgk_dev_colmap', JSON.stringify(colMap));
-  localStorage.setItem('qgk_dev_source', importSource);
+  // Cria nova fonte com os dados atuais
+  const pend = _arquivoPendente;
+  const novaFonte = {
+    id:     Date.now(),
+    nome:   pend?.file?.name || 'Importação',
+    source: importSource,
+    rows:   [...csvRows],  // snapshot das linhas atuais
+    colMap: { ...colMap },
+  };
+  fontes.push(novaFonte);
+  salvarFontes();
+  renderFontesList();
   mostrarStatsImport(); atualizarBadgeCSV(); setStep(2);
   document.getElementById('cardBusca').style.display = 'block';
   document.getElementById('btnProximo').style.display = 'block';
-  document.getElementById('btnTrocar').style.display = 'inline-flex';
-  showToast(`✓ ${csvRows.length} pedidos importados!`, 'success');
+  showToast(`✓ ${novaFonte.rows.length} pedidos adicionados!`, 'success');
   iniciarModo('manual');
+  // Processa próximo arquivo se houver fila
+  const cb = pend?.onDone;
+  _arquivoPendente = null;
+  if (cb) cb();
+}
+
+function salvarFontes() {
+  localStorage.setItem('qgk_dev_fontes', JSON.stringify(fontes));
+}
+
+function removerFonte(id) {
+  fontes = fontes.filter(f => f.id !== id);
+  salvarFontes();
+  renderFontesList();
+  mostrarStatsImport(); atualizarBadgeCSV();
+  if (!fontes.length) {
+    document.getElementById('cardBusca').style.display = 'none';
+    document.getElementById('btnProximo').style.display = 'none';
+    document.getElementById('importStats').style.display = 'none';
+    document.getElementById('fontesList').style.display = 'none';
+    setStep(1);
+  }
+}
+
+function renderFontesList() {
+  const el = document.getElementById('fontesList');
+  if (!fontes.length) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = fontes.map(f => {
+    const label = f.source === 'ml' ? '🛒 ML' : '🛍 Shopee';
+    return `<div class="fonte-chip">
+      <div class="fonte-chip-dot ${f.source}"></div>
+      <div class="fonte-chip-info">
+        <div class="fonte-chip-nome">${escHtml(f.nome)}</div>
+        <div class="fonte-chip-meta">${label} · ${f.rows.length} pedidos</div>
+      </div>
+      <button class="fonte-chip-remove" onclick="removerFonte(${f.id})" title="Remover">✕</button>
+    </div>`;
+  }).join('');
 }
 
 function mostrarStatsImport() {
+  if (!fontes.length) return;
   document.getElementById('importStats').style.display = 'flex';
-  document.getElementById('statTotal').textContent = csvRows.length;
-  document.getElementById('statMotivos').textContent = new Set(csvRows.map(r => r[colMap?.motivo||'']||'').filter(Boolean)).size;
-  document.getElementById('statLojas').textContent = new Set(csvRows.map(r => r[colMap?.loja||'']||'').filter(Boolean)).size || '—';
+  const total = fontes.reduce((s, f) => s + f.rows.length, 0);
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statArquivos').textContent = fontes.length;
+  const motivos = new Set(fontes.flatMap(f =>
+    f.rows.map(r => r[f.colMap?.motivo||'']||'').filter(Boolean)));
+  document.getElementById('statMotivos').textContent = motivos.size || '—';
 }
 
 function atualizarBadgeCSV() {
   const b = document.getElementById('csvBadge');
-  if (csvRows.length) { b.textContent = csvRows.length+' PEDIDOS'; b.classList.add('loaded'); }
+  const total = fontes.reduce((s,f) => s+f.rows.length, 0);
+  if (total) { b.textContent = total+' PEDIDOS'; b.classList.add('loaded'); }
   else { b.textContent = 'SEM CSV'; b.classList.remove('loaded'); }
 }
 
@@ -879,7 +991,7 @@ function iniciarModo(mode) {
 }
 
 async function iniciarCamera() {
-  if (!csvRows.length) { showToast('Importe um CSV primeiro','error'); return; }
+  if (!fontes.length) { showToast('Importe um CSV primeiro','error'); return; }
   try {
     streamCam = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
     const v = document.getElementById('scanVideo'); v.srcObject = streamCam; v.play();
@@ -929,12 +1041,15 @@ async function buscarPorCodigo(codigo) {
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
   const n = norm(codigo);
 
-  // ── 1. Busca no CSV importado (instantânea) ──────────────────────────────
-  if (csvRows.length) {
-    const r = csvRows.find(row => Object.values(row).some(v => norm(v).includes(n)));
+  // ── 1. Busca em cada fonte separadamente (mantém origem) ──────────────
+  for (const fonte of fontes) {
+    const r = fonte.rows.find(row => Object.values(row).some(v => norm(v).includes(n)));
     if (r) {
+      const cmOrig = colMap, srcOrig = importSource;
+      colMap = fonte.colMap; importSource = fonte.source;
       pedidoAtual = r;
       mostrarResultado(r, 'csv');
+      colMap = cmOrig; importSource = srcOrig;
       mostrarFormulario(); setStep(3);
       setTimeout(()=>document.getElementById('cardInspect').scrollIntoView({behavior:'smooth'}),100);
       return;
@@ -1680,10 +1795,17 @@ async function buscarCodigoInspetor(codigo) {
     .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
   const n = norm(codigo);
 
-  // 1. CSV
-  if (csvRows.length) {
-    const r = csvRows.find(row => Object.values(row).some(v => norm(v).includes(n)));
-    if (r) { mostrarResultadoIns(r, 'csv'); mostrarFormularioIns(); return; }
+  // 1. Busca em cada fonte separadamente
+  for (const fonte of fontes) {
+    const r = fonte.rows.find(row => Object.values(row).some(v => norm(v).includes(n)));
+    if (r) {
+      const colMapOriginal = colMap;
+      colMap = fonte.colMap;
+      importSource = fonte.source;
+      mostrarResultadoIns(r, 'csv');
+      colMap = colMapOriginal;
+      mostrarFormularioIns(); return;
+    }
   }
 
   // 2. Planilha
@@ -1699,7 +1821,7 @@ async function buscarCodigoInspetor(codigo) {
     } else {
       nfEl.style.display = 'block';
       document.getElementById('notFoundCodeIns').textContent =
-        csvRows.length ? codigo : codigo + ' — importe um CSV ou verifique a conexão';
+        fontes.length ? codigo : codigo + ' — importe um CSV ou verifique a conexão';
     }
   } catch {
     buscEl.style.display = 'none';
