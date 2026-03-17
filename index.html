@@ -268,9 +268,97 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
 .stat-card-sm-label { font-size: 10px; color: var(--text3); margin-top: 3px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
 @media (max-width: 480px) { .bar-label { min-width: 100px; max-width: 100px; } .comp-grid { flex-direction: column; } }
 
+
+/* SELEÇÃO DE PERFIL */
+.perfil-screen {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9000; padding: 20px;
+}
+.perfil-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 32px 28px;
+  width: 100%; max-width: 420px; box-shadow: var(--shadow-md);
+  text-align: center;
+}
+.perfil-logo { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 28px; }
+.perfil-logo-icon { width: 44px; height: 44px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.perfil-logo-icon svg { width: 22px; height: 22px; fill: white; }
+.perfil-logo-text { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); text-align: left; }
+.perfil-logo-sub { font-size: 10px; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; font-family: 'DM Mono', monospace; display: block; margin-top: -2px; }
+.perfil-heading { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+.perfil-sub { font-size: 12px; color: var(--text3); margin-bottom: 24px; font-family: 'DM Mono', monospace; }
+.perfil-options { display: flex; flex-direction: column; gap: 10px; }
+.perfil-btn {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px; border: 1.5px solid var(--border2);
+  border-radius: 10px; background: var(--surface2);
+  cursor: pointer; text-align: left; transition: all 0.15s;
+  width: 100%;
+}
+.perfil-btn:hover { border-color: var(--accent); background: var(--bg); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.perfil-btn-icon { font-size: 28px; flex-shrink: 0; }
+.perfil-btn-info { flex: 1; }
+.perfil-btn-title { font-size: 14px; font-weight: 700; color: var(--text); font-family: 'DM Sans', sans-serif; }
+.perfil-btn-desc { font-size: 11px; color: var(--text3); margin-top: 2px; font-family: 'DM Mono', monospace; }
+.perfil-chip-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.perfil-chip { font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 600; background: var(--surface); border: 1px solid var(--border2); color: var(--text3); }
+.perfil-trocar { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text3); cursor: pointer; background: none; border: none; padding: 4px 0; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: color 0.15s; }
+.perfil-trocar:hover { color: var(--text); }
+.topbar-perfil { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); font-size: 12px; font-weight: 600; color: var(--text2); cursor: pointer; transition: all 0.15s; }
+.topbar-perfil:hover { background: var(--bg); }
+.topbar-perfil-dot { width: 8px; height: 8px; border-radius: 50%; }
+.topbar-perfil-dot.importadora { background: var(--blue); }
+.topbar-perfil-dot.inspetor { background: var(--green); }
+
 </style>
 </head>
 <body>
+
+<!-- SELEÇÃO DE PERFIL -->
+<div class="perfil-screen" id="perfilScreen">
+  <div class="perfil-card">
+    <div class="perfil-logo">
+      <div class="perfil-logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      </div>
+      <div>
+        <div class="perfil-logo-text">QGK</div>
+        <span class="perfil-logo-sub">Devoluções</span>
+      </div>
+    </div>
+    <div class="perfil-heading">Quem está acessando?</div>
+    <div class="perfil-sub">Selecione seu perfil para continuar</div>
+    <div class="perfil-options">
+      <button class="perfil-btn" onclick="selecionarPerfil('importadora')">
+        <span class="perfil-btn-icon">📂</span>
+        <div class="perfil-btn-info">
+          <div class="perfil-btn-title">Importadora de CSV</div>
+          <div class="perfil-btn-desc">Alimenta o sistema com os relatórios</div>
+          <div class="perfil-chip-row">
+            <span class="perfil-chip">Importar CSV</span>
+            <span class="perfil-chip">Histórico</span>
+            <span class="perfil-chip">Análises</span>
+            <span class="perfil-chip">Pesquisar</span>
+          </div>
+        </div>
+      </button>
+      <button class="perfil-btn" onclick="selecionarPerfil('inspetor')">
+        <span class="perfil-btn-icon">🔬</span>
+        <div class="perfil-btn-info">
+          <div class="perfil-btn-title">Inspetor</div>
+          <div class="perfil-btn-desc">Escaneia etiquetas e averigua produtos</div>
+          <div class="perfil-chip-row">
+            <span class="perfil-chip">Escanear QR</span>
+            <span class="perfil-chip">Inspecionar</span>
+            <span class="perfil-chip">Histórico</span>
+            <span class="perfil-chip">Análises</span>
+          </div>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- TOPBAR -->
 <div class="topbar">
@@ -287,12 +375,17 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
     <div class="sync-dot" id="syncDot"></div>
     <span id="syncText" style="font-size:12px;color:var(--text3);">–</span>
     <div class="csv-badge" id="csvBadge">SEM CSV</div>
+    <button class="topbar-perfil" id="topbarPerfil" onclick="trocarPerfil()" title="Trocar perfil" style="display:none">
+      <div class="topbar-perfil-dot" id="topbarPerfilDot"></div>
+      <span id="topbarPerfilNome">–</span>
+      ↺
+    </button>
   </div>
 </div>
 
 <!-- PAGE NAV -->
 <div class="page-nav">
-  <button class="page-nav-btn active" onclick="showSection('lancar',this)">
+  <button class="page-nav-btn active" id="navLancar" onclick="showSection('lancar',this)">
     <span class="nav-icon">📦</span>Lançar
   </button>
   <button class="page-nav-btn" onclick="showSection('pesquisar',this)">
@@ -386,7 +479,14 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:6px;font-family:'DM Mono',monospace;">Busca em todos os campos do CSV importado</div>
     </div>
-    <div class="not-found" id="notFound">⚠️ Pedido não encontrado — <span id="notFoundCode" style="font-family:'DM Mono',monospace"></span></div>
+    <div class="not-found" id="notFound" style="display:none">
+      ⚠️ Pedido não encontrado no CSV nem na planilha —
+      <span id="notFoundCode" style="font-family:'DM Mono',monospace"></span>
+    </div>
+    <div id="buscandoSheets" style="display:none;padding:12px 14px;background:var(--blue-bg);border:1px solid #bfdbfe;border-radius:8px;margin-top:12px;font-size:13px;color:var(--blue);font-weight:500;display:none;align-items:center;gap:8px;">
+      <span class="spinner" style="border-top-color:var(--blue)"></span>
+      Buscando na planilha...
+    </div>
   </div>
 
   <!-- RESULTADO -->
@@ -398,6 +498,7 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
     <div class="result-body">
       <div class="result-produto" id="resultProduto">—</div>
       <div class="result-fields" id="resultFields"></div>
+      <div id="avisoJaInspecionado" style="display:none;margin-top:10px;padding:8px 12px;background:var(--orange-bg);border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:var(--orange);font-weight:600;">⚠️ Este pedido já possui uma inspeção registrada</div>
     </div>
   </div>
 
@@ -582,7 +683,7 @@ const CAMPOS = [
 ];
 
 // INIT
-window.addEventListener('load', () => {
+function iniciarApp() {
   carregarHistorico(); renderHistorico();
   const cc = localStorage.getItem('qgk_dev_csv');
   const cm = localStorage.getItem('qgk_dev_colmap');
@@ -601,6 +702,18 @@ window.addEventListener('load', () => {
   dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); processarArquivo(e.dataTransfer.files[0]); });
   sincronizarHistorico();
   setTimeout(reenviarPendentes, 5000);
+}
+
+window.addEventListener('load', () => {
+  // Verifica se há perfil salvo na sessão atual
+  const perfilSalvo = sessionStorage.getItem('qgk_dev_perfil');
+  if (perfilSalvo && PERFIS[perfilSalvo]) {
+    perfilAtivo = perfilSalvo;
+    document.getElementById('perfilScreen').style.display = 'none';
+    aplicarPerfil(perfilSalvo);
+    iniciarApp();
+  }
+  // Caso contrário, a tela de perfil já está visível (display:flex no CSS)
 });
 
 // STEPS
@@ -757,29 +870,83 @@ function processarCodigo(code) {
 // BUSCA
 function buscarPedido() { const c=document.getElementById('inputCodigo').value.trim(); if(c)buscarPorCodigo(c); }
 
-function buscarPorCodigo(codigo) {
-  if (!csvRows.length) { showToast('Importe um CSV primeiro','error'); return; }
-  const norm = s => String(s).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+async function buscarPorCodigo(codigo) {
+  const notFound      = document.getElementById('notFound');
+  const buscandoEl    = document.getElementById('buscandoSheets');
+  const resultCard    = document.getElementById('resultCard');
+
+  // Limpa estado anterior
+  notFound.style.display = 'none';
+  buscandoEl.style.display = 'none';
+  resultCard.classList.remove('visible');
+  document.getElementById('cardInspect').style.display = 'none';
+
+  const norm = s => String(s).toLowerCase().trim()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
   const n = norm(codigo);
-  const r = csvRows.find(row => Object.values(row).some(v => norm(v).includes(n)));
-  document.getElementById('notFound').classList.remove('visible');
-  document.getElementById('resultCard').classList.remove('visible');
-  if (r) {
-    pedidoAtual = r; mostrarResultado(r); mostrarFormulario(); setStep(3);
-    setTimeout(()=>document.getElementById('cardInspect').scrollIntoView({behavior:'smooth'}),100);
-  } else {
-    document.getElementById('notFound').classList.add('visible');
-    document.getElementById('notFoundCode').textContent = codigo;
-    pedidoAtual = null; document.getElementById('cardInspect').style.display = 'none';
+
+  // ── 1. Busca no CSV importado (instantânea) ──────────────────────────────
+  if (csvRows.length) {
+    const r = csvRows.find(row => Object.values(row).some(v => norm(v).includes(n)));
+    if (r) {
+      pedidoAtual = r;
+      mostrarResultado(r, 'csv');
+      mostrarFormulario(); setStep(3);
+      setTimeout(()=>document.getElementById('cardInspect').scrollIntoView({behavior:'smooth'}),100);
+      return;
+    }
+  }
+
+  // ── 2. Não achou no CSV → tenta na planilha (Sheets) ────────────────────
+  buscandoEl.style.display = 'flex';
+  try {
+    const res = await jsonpRequest({ action: 'buscarPedidoDevolucao', codigo });
+    buscandoEl.style.display = 'none';
+
+    if (res && res.encontrado) {
+      // Converte resultado da planilha para o formato de pedidoAtual
+      pedidoAtual = res.dados;
+      pedidoAtual._origemSheets = true;
+      if (res.jaInspecionado) pedidoAtual._jaInspecionado = true;
+      mostrarResultado(pedidoAtual, 'sheets');
+      mostrarFormulario(); setStep(3);
+      setTimeout(()=>document.getElementById('cardInspect').scrollIntoView({behavior:'smooth'}),100);
+    } else {
+      notFound.style.display = 'block';
+      document.getElementById('notFoundCode').textContent = codigo;
+      pedidoAtual = null;
+    }
+  } catch(e) {
+    buscandoEl.style.display = 'none';
+    // Falhou a consulta ao Sheets — mostra não encontrado com aviso
+    notFound.style.display = 'block';
+    document.getElementById('notFoundCode').textContent =
+      csvRows.length
+        ? codigo + ' (planilha indisponível)'
+        : codigo + ' — importe um CSV ou verifique a conexão';
+    pedidoAtual = null;
   }
 }
 
 // RESULTADO
-function mostrarResultado(row) {
-  const get = k => colMap?.[k] ? (row[colMap[k]]||'—') : '—';
+function mostrarResultado(row, origem) {
+  // Se veio do Sheets, campos já estão normalizados com nomes fixos
+  // Se veio do CSV, usa o mapeamento colMap
+  const get = k => {
+    if (row._origemSheets) return row[k] || '—';
+    return colMap?.[k] ? (row[colMap[k]]||'—') : '—';
+  };
   const motivo = get('motivo'), mc = classMot(motivo);
-  document.getElementById('resultProduto').textContent = get('produto');
-  document.getElementById('resultSource').textContent = importSource==='ml'?'🛒 ML':'🛍 Shopee';
+  const nomeProduto = get('produto');
+  const resultProdEl = document.getElementById('resultProduto');
+  if (!nomeProduto || nomeProduto === '—') {
+    resultProdEl.textContent = 'Nome do produto não disponível na planilha';
+    resultProdEl.style.cssText = 'color:var(--text3);font-size:13px;font-weight:400';
+  } else {
+    resultProdEl.textContent = nomeProduto;
+  }
+  const origemLabel = origem==='sheets' ? '☁ Planilha' : importSource==='ml'?'🛒 ML':'🛍 Shopee';
+  document.getElementById('resultSource').textContent = origemLabel;
   document.getElementById('resultTitle').textContent = `Pedido ${get('pedido')}`;
   document.getElementById('resultFields').innerHTML = [
     ['Pedido',    `<span style="font-family:'DM Mono',monospace">${get('pedido')}</span>`],
@@ -790,6 +957,9 @@ function mostrarResultado(row) {
     get('data')!=='—'?['Data',get('data')]:null,
   ].filter(Boolean).map(([k,v])=>`<div class="result-field"><div class="result-field-key">${k}</div><div class="result-field-val">${v}</div></div>`).join('');
   document.getElementById('resultCard').classList.add('visible');
+  // Aviso se pedido já foi inspecionado antes
+  const avisoEl = document.getElementById('avisoJaInspecionado');
+  if (avisoEl) avisoEl.style.display = row._jaInspecionado ? 'block' : 'none';
 }
 
 function classMot(m) { const s=m.toLowerCase(); return s.includes('arrepend')||s.includes('desist')?'arrep':s.includes('defeito')||s.includes('quebr')||s.includes('danif')?'defeito':s.includes('errado')||s.includes('diferente')?'errado':'outro'; }
@@ -1225,6 +1395,382 @@ function renderChartEstado() {
       <div class="bar-track"><div class="bar-fill ${cores[k]}" style="width:${Math.round(v/max*100)}%"></div></div>
       <div class="bar-val">${v} <span style="color:var(--text3);font-size:10px">(${Math.round(v/total*100)}%)</span></div>
     </div>`).join('');
+}
+
+
+// ═══════════════════════════════════════════
+// PERFIL DE ACESSO
+// ═══════════════════════════════════════════
+let perfilAtivo = null; // 'importadora' | 'inspetor'
+
+const PERFIS = {
+  importadora: {
+    nome: 'Importadora',
+    cor: 'importadora',
+    navAbas: ['lancar','pesquisar','analises'],  // abas visíveis
+    secInicial: 'lancar',
+  },
+  inspetor: {
+    nome: 'Inspetor',
+    cor: 'inspetor',
+    navAbas: ['pesquisar','analises'],  // sem "Lançar" (CSV)
+    secInicial: 'pesquisar',           // começa direto na busca
+  },
+};
+
+function selecionarPerfil(perfil) {
+  perfilAtivo = perfil;
+  sessionStorage.setItem('qgk_dev_perfil', perfil);
+  document.getElementById('perfilScreen').style.display = 'none';
+  aplicarPerfil(perfil);
+  iniciarApp();
+}
+
+function aplicarPerfil(perfil) {
+  const cfg = PERFIS[perfil];
+
+  // Atualiza chip na topbar
+  const chip = document.getElementById('topbarPerfil');
+  const dot  = document.getElementById('topbarPerfilDot');
+  const nome = document.getElementById('topbarPerfilNome');
+  chip.style.display = 'flex';
+  dot.className = 'topbar-perfil-dot ' + cfg.cor;
+  nome.textContent = cfg.nome;
+
+  // Mostra/oculta botões da nav conforme perfil
+  const navBtns = document.querySelectorAll('.page-nav-btn');
+  const secoes  = ['lancar','pesquisar','analises'];
+  navBtns.forEach((btn, i) => {
+    const sec = secoes[i];
+    if (sec) btn.style.display = cfg.navAbas.includes(sec) ? '' : 'none';
+  });
+
+  // Navega para a seção inicial do perfil
+  const primeiroBtn = [...navBtns].find(b => b.style.display !== 'none');
+  showSection(cfg.secInicial, primeiroBtn);
+
+  // Inspetor: abre câmera automaticamente ao entrar (se CSV disponível)
+  if (perfil === 'inspetor') {
+    // Muda a seção inicial para "busca com câmera" dentro do sec-lancar
+    // mas a aba Lançar está oculta — o Inspetor usa sec-pesquisar para busca
+    // e o card de scan fica dentro da seção pesquisar para ele
+    mostrarCardScanInspetor();
+  }
+}
+
+function trocarPerfil() {
+  sessionStorage.removeItem('qgk_dev_perfil');
+  perfilAtivo = null;
+  pararCamera();
+  document.getElementById('perfilScreen').style.display = 'flex';
+  document.getElementById('topbarPerfil').style.display = 'none';
+}
+
+/** Para o Inspetor, injecta o card de scan no topo da seção pesquisar */
+function mostrarCardScanInspetor() {
+  const secPesquisar = document.getElementById('sec-pesquisar');
+  if (!secPesquisar || document.getElementById('cardScanInspetor')) return;
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'cardScanInspetor';
+  card.innerHTML = `
+    <div class="card-header">
+      <div>
+        <div class="card-title">📷 Escanear etiqueta</div>
+        <div class="card-sub">QR Code ou código manual da devolução</div>
+      </div>
+    </div>
+    <div class="mode-row">
+      <button class="mode-btn active" id="modeBtnCamIns" onclick="setModeInspetor('camera',this)">
+        <span class="mode-icon">📷</span><span>Câmera / QR</span>
+      </button>
+      <button class="mode-btn" id="modeBtnManIns" onclick="setModeInspetor('manual',this)">
+        <span class="mode-icon">⌨️</span><span>Manual</span>
+      </button>
+    </div>
+    <div class="camera-wrap" id="cameraWrapIns">
+      <video id="scanVideoIns" autoplay playsinline muted></video>
+      <div class="camera-overlay"></div>
+      <div class="camera-hint">Aponte para o QR Code da etiqueta de devolução</div>
+    </div>
+    <button class="btn-ghost" id="btnCamStopIns" style="width:100%;margin-top:8px;display:none" onclick="pararCameraInspetor()">⬛ Parar câmera</button>
+    <div id="manualWrapIns" style="display:none">
+      <div class="input-row">
+        <input type="text" class="field-input" id="inputCodigoIns"
+          placeholder="Código do pedido / O.C / SKU"
+          onkeydown="if(event.key==='Enter')buscarInspetor()">
+        <button class="btn-primary" onclick="buscarInspetor()">Buscar</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;font-family:'DM Mono',monospace;">
+        Busca no CSV importado e na planilha
+      </div>
+    </div>
+    <div class="not-found" id="notFoundIns" style="display:none;margin-top:12px">
+      ⚠️ Pedido não encontrado —
+      <span id="notFoundCodeIns" style="font-family:'DM Mono',monospace"></span>
+    </div>
+    <div id="buscandoSheetsIns" style="display:none;padding:12px 14px;background:var(--blue-bg);border:1px solid #bfdbfe;border-radius:8px;margin-top:12px;font-size:13px;color:var(--blue);font-weight:500;align-items:center;gap:8px;">
+      <span class="spinner" style="border-top-color:var(--blue)"></span>
+      Buscando na planilha...
+    </div>`;
+  secPesquisar.insertBefore(card, secPesquisar.firstChild);
+
+  // Resultado + formulário de inspeção para o inspetor
+  const resultIns = document.createElement('div');
+  resultIns.id = 'resultCardIns';
+  resultIns.className = 'result-wrap';
+  resultIns.style.marginBottom = '18px';
+  resultIns.innerHTML = `
+    <div class="result-head">
+      <div class="result-head-title" id="resultTitleIns">Pedido encontrado</div>
+      <div class="result-badge" id="resultSourceIns">—</div>
+    </div>
+    <div class="result-body">
+      <div class="result-produto" id="resultProdutoIns">—</div>
+      <div class="result-fields" id="resultFieldsIns"></div>
+      <div id="avisoJaInspecionadoIns" style="display:none;margin-top:10px;padding:8px 12px;background:var(--orange-bg);border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:var(--orange);font-weight:600;">⚠️ Este pedido já possui uma inspeção registrada</div>
+    </div>`;
+  secPesquisar.insertBefore(resultIns, secPesquisar.children[1]);
+
+  // Clona o card de inspeção para o inspetor
+  const origInspect = document.getElementById('cardInspect');
+  const cloneInspect = origInspect.cloneNode(true);
+  cloneInspect.id = 'cardInspectIns';
+  cloneInspect.style.display = 'none';
+  // Redireciona os IDs internos para versão Ins
+  cloneInspect.querySelectorAll('[id]').forEach(el => { el.id = el.id + 'Ins'; });
+  // Corrige os onclick para apontar para as funções do inspetor
+  cloneInspect.querySelector('#btnSalvarIns').onclick = salvarInspecaoInspetor;
+  ['correto','itens'].forEach(k => {
+    const c = cap(k);
+    cloneInspect.querySelector('#btn'+c+'SimIns').onclick = e => setToggleIns(k, true, e);
+    cloneInspect.querySelector('#btn'+c+'NaoIns').onclick = e => setToggleIns(k, false, e);
+  });
+  ['Ok','Amass','Danif','Quebr'].forEach(e2 => {
+    cloneInspect.querySelector('#e'+e2+'Ins').onclick = () => setEstadoIns(e2.toLowerCase());
+  });
+  secPesquisar.insertBefore(cloneInspect, secPesquisar.children[2]);
+}
+
+// ── CAMERA DO INSPETOR ─────────────────────────────────────────────────
+let streamIns = null, scanIntervalIns = null;
+let _ultIns = '', _tsIns = 0;
+let togglesIns = { correto: null, itens: null }, estadoFisicoIns = null;
+
+function setModeInspetor(mode, el) {
+  document.querySelectorAll('#cardScanInspetor .mode-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  pararCameraInspetor();
+  const cw = document.getElementById('cameraWrapIns');
+  const cs = document.getElementById('btnCamStopIns');
+  const mw = document.getElementById('manualWrapIns');
+  if (mode === 'camera') {
+    cw.classList.add('active'); cs.style.display = 'block'; mw.style.display = 'none';
+    iniciarCameraInspetor();
+  } else {
+    cw.classList.remove('active'); cs.style.display = 'none'; mw.style.display = 'block';
+    setTimeout(() => document.getElementById('inputCodigoIns')?.focus(), 100);
+  }
+}
+
+async function iniciarCameraInspetor() {
+  try {
+    streamIns = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const v = document.getElementById('scanVideoIns');
+    v.srcObject = streamIns; v.play();
+    iniciarLeituraQRIns(v);
+  } catch {
+    showToast('Câmera indisponível — use o modo manual', 'error');
+    setModeInspetor('manual', document.getElementById('modeBtnManIns'));
+  }
+}
+
+function pararCameraInspetor() {
+  if (streamIns) { streamIns.getTracks().forEach(t => t.stop()); streamIns = null; }
+  if (scanIntervalIns) { clearInterval(scanIntervalIns); scanIntervalIns = null; }
+  const cw = document.getElementById('cameraWrapIns');
+  const cs = document.getElementById('btnCamStopIns');
+  if (cw) cw.classList.remove('active');
+  if (cs) cs.style.display = 'none';
+}
+
+function iniciarLeituraQRIns(v) {
+  if ('BarcodeDetector' in window) {
+    const det = new BarcodeDetector({ formats: ['qr_code','code_128','code_39','ean_13'] });
+    scanIntervalIns = setInterval(async () => {
+      if (v.readyState !== 4) return;
+      try { const b = await det.detect(v); if (b.length) processarCodigoIns(b[0].rawValue); } catch {}
+    }, 400);
+  } else {
+    carregarZXing(() => new ZXing.BrowserMultiFormatReader()
+      .decodeFromVideoElement(v, r => { if (r) processarCodigoIns(r.getText()); }));
+  }
+}
+
+function processarCodigoIns(code) {
+  const now = Date.now();
+  if (code === _ultIns && now - _tsIns < 3000) return;
+  _ultIns = code; _tsIns = now;
+  const m = code.match(/(\d{8,})/);
+  buscarCodigoInspetor(m ? m[1] : code);
+}
+
+function buscarInspetor() {
+  const c = document.getElementById('inputCodigoIns')?.value.trim();
+  if (c) buscarCodigoInspetor(c);
+}
+
+async function buscarCodigoInspetor(codigo) {
+  const nfEl   = document.getElementById('notFoundIns');
+  const buscEl = document.getElementById('buscandoSheetsIns');
+  const rcEl   = document.getElementById('resultCardIns');
+  const ciEl   = document.getElementById('cardInspectIns');
+
+  nfEl.style.display = 'none';
+  buscEl.style.display = 'none';
+  rcEl?.classList.remove('visible');
+  if (ciEl) ciEl.style.display = 'none';
+
+  const norm = s => String(s).toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+  const n = norm(codigo);
+
+  // 1. CSV
+  if (csvRows.length) {
+    const r = csvRows.find(row => Object.values(row).some(v => norm(v).includes(n)));
+    if (r) { mostrarResultadoIns(r, 'csv'); mostrarFormularioIns(); return; }
+  }
+
+  // 2. Planilha
+  buscEl.style.display = 'flex';
+  try {
+    const res = await jsonpRequest({ action: 'buscarPedidoDevolucao', codigo });
+    buscEl.style.display = 'none';
+    if (res && res.encontrado) {
+      res.dados._origemSheets = true;
+      if (res.jaInspecionado) res.dados._jaInspecionado = true;
+      mostrarResultadoIns(res.dados, 'sheets');
+      mostrarFormularioIns();
+    } else {
+      nfEl.style.display = 'block';
+      document.getElementById('notFoundCodeIns').textContent =
+        csvRows.length ? codigo : codigo + ' — importe um CSV ou verifique a conexão';
+    }
+  } catch {
+    buscEl.style.display = 'none';
+    nfEl.style.display = 'block';
+    document.getElementById('notFoundCodeIns').textContent = codigo + ' (planilha indisponível)';
+  }
+}
+
+function mostrarResultadoIns(row, origem) {
+  const get = k => row._origemSheets ? (row[k]||'—') : (colMap?.[k] ? (row[colMap[k]]||'—') : '—');
+  const motivo = get('motivo'), mc = classMot(motivo);
+  const el = document.getElementById('resultProdutoIns');
+  const nome = get('produto');
+  if (!nome || nome === '—') {
+    el.textContent = 'Nome do produto não disponível';
+    el.style.cssText = 'color:var(--text3);font-size:13px;font-weight:400';
+  } else {
+    el.textContent = nome; el.style.cssText = '';
+  }
+  document.getElementById('resultSourceIns').textContent = origem==='sheets'?'☁ Planilha':importSource==='ml'?'🛒 ML':'🛍 Shopee';
+  document.getElementById('resultTitleIns').textContent = `Pedido ${get('pedido')}`;
+  document.getElementById('resultFieldsIns').innerHTML = [
+    ['Pedido',    `<span style="font-family:'DM Mono',monospace">${get('pedido')}</span>`],
+    ['SKU',       `<span style="font-family:'DM Mono',monospace">${get('sku')}</span>`],
+    ['Comprador', get('comprador')],
+    ['Motivo',    `<span class="motivo-tag ${mc}">${motEmoji(mc)} ${motivo}</span>`],
+    get('loja')!=='—'?['Loja',get('loja')]:null,
+    get('data')!=='—'?['Data',get('data')]:null,
+  ].filter(Boolean).map(([k,v])=>`<div class="result-field"><div class="result-field-key">${k}</div><div class="result-field-val">${v}</div></div>`).join('');
+  const aviso = document.getElementById('avisoJaInspecionadoIns');
+  if (aviso) aviso.style.display = row._jaInspecionado ? 'block' : 'none';
+  document.getElementById('resultCardIns')?.classList.add('visible');
+  pedidoAtual = row; // mantém referência para o salvar
+}
+
+function mostrarFormularioIns() {
+  togglesIns = { correto: null, itens: null }; estadoFisicoIns = null;
+  const ci = document.getElementById('cardInspectIns');
+  if (!ci) return;
+  resetTogIns('correto'); resetTogIns('itens');
+  ['Ok','Amass','Danif','Quebr'].forEach(e => {
+    const el = document.getElementById('e'+e+'Ins');
+    if (el) el.className = 'estado-btn';
+  });
+  const obs = document.getElementById('inputObsIns');
+  if (obs) obs.value = '';
+  ci.style.display = 'block';
+  setTimeout(() => ci.scrollIntoView({ behavior: 'smooth' }), 100);
+}
+
+function resetTogIns(k) {
+  const c = cap(k);
+  document.getElementById('tog'+c+'Ins')?.classList.remove('yes','no');
+  document.getElementById('btn'+c+'SimIns')?.classList.remove('on');
+  document.getElementById('btn'+c+'NaoIns')?.classList.remove('on');
+  const txt = document.getElementById('txt'+c+'Ins');
+  if (txt) txt.textContent = k==='correto'?'É o produto esperado?':'Todos os itens presentes?';
+}
+
+function setToggleIns(k, val, e) {
+  if (e) e.stopPropagation();
+  if (togglesIns[k] === val) val = null;
+  togglesIns[k] = val;
+  const c = cap(k);
+  const card = document.getElementById('tog'+c+'Ins');
+  const bS   = document.getElementById('btn'+c+'SimIns');
+  const bN   = document.getElementById('btn'+c+'NaoIns');
+  const txt  = document.getElementById('txt'+c+'Ins');
+  card?.classList.remove('yes','no'); bS?.classList.remove('on'); bN?.classList.remove('on');
+  if (val===true)  { card?.classList.add('yes'); bS?.classList.add('on'); txt && (txt.textContent=k==='correto'?'✓ Produto correto':'✓ Itens completos'); }
+  if (val===false) { card?.classList.add('no');  bN?.classList.add('on'); txt && (txt.textContent=k==='correto'?'✗ Produto DIFERENTE':'✗ Itens FALTANDO'); }
+  if (val===null)  { txt && (txt.textContent=k==='correto'?'É o produto esperado?':'Todos os itens presentes?'); }
+}
+
+function setEstadoIns(e) {
+  estadoFisicoIns = e;
+  const m = {ok:'Ok',amass:'Amass',danif:'Danif',quebr:'Quebr'};
+  const c = {ok:'e-ok',amass:'e-amass',danif:'e-danif',quebr:'e-quebr'};
+  Object.keys(m).forEach(k => {
+    const el = document.getElementById('e'+m[k]+'Ins');
+    if (el) el.className = 'estado-btn' + (k===e?' '+c[k]:'');
+  });
+}
+
+async function salvarInspecaoInspetor() {
+  if (!pedidoAtual) return;
+  const inspector = document.getElementById('inputInspectorIns')?.value.trim();
+  if (!inspector) { showToast('Informe quem fez a inspeção','error'); return; }
+  const get = k => pedidoAtual._origemSheets ? (pedidoAtual[k]||'') : (colMap?.[k]?(pedidoAtual[colMap[k]]||''):'');
+  const ins = {
+    id: Date.now(), timestamp: new Date().toISOString(), source: importSource,
+    pedido: get('pedido'), produto: get('produto'), sku: get('sku'),
+    motivo: get('motivo'), comprador: get('comprador'), loja: get('loja'), data: get('data'),
+    correto: togglesIns.correto, itensCompletos: togglesIns.itens,
+    estadoFisico: estadoFisicoIns,
+    obs: document.getElementById('inputObsIns')?.value.trim() || '',
+    inspector, _sincronizado: false,
+  };
+  inspecoes.unshift(ins);
+  localStorage.setItem('qgk_dev_inspecoes', JSON.stringify(inspecoes));
+  renderHistorico();
+  document.getElementById('cardInspectIns').style.display = 'none';
+  document.getElementById('resultCardIns')?.classList.remove('visible');
+  const inp = document.getElementById('inputCodigoIns');
+  if (inp) inp.value = '';
+  pedidoAtual = null;
+  await salvarNaPlanilha(ins);
+  localStorage.setItem('qgk_dev_inspecoes', JSON.stringify(inspecoes));
+  renderHistorico();
+  showToast('✓ Inspeção salva!','success');
+  // Reinicia câmera para próxima leitura
+  setTimeout(() => {
+    const modeBtn = document.getElementById('modeBtnCamIns');
+    if (modeBtn) setModeInspetor('camera', modeBtn);
+  }, 1200);
 }
 
 // TOAST
