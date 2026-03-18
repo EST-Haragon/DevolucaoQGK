@@ -1267,16 +1267,31 @@ function setSyncStatus(state) {
 }
 
 async function salvarNaPlanilha(ins) {
-  const btn=document.getElementById('btnSalvar');
-  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Salvando...';
+  // Log diagnóstico — mostra o que vai ser enviado
+  console.log('SALVAR — dados:', {
+    pedido: ins.pedido, produto: ins.produto, sku: ins.sku,
+    inspector: ins.inspector, source: ins.source,
+    _colMap: ins._colMap, _source: ins._source
+  });
+
+  const btn = document.getElementById('btnSalvar') || document.getElementById('btnSalvarIns');
+  if (btn) { btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Salvando...'; }
   try {
-    await jsonpRequest({action:'salvarInspecao',data:JSON.stringify(ins)});
-    ins._sincronizado=true; delete ins._pendente; setSyncStatus('ok');
-    showToast('✓ Salvo na planilha!','success');
-  } catch {
+    const res = await jsonpRequest({action:'salvarInspecao', data:JSON.stringify(ins)});
+    console.log('SALVAR — resposta:', res);
+    if (res && res.ok) {
+      ins._sincronizado=true; delete ins._pendente; setSyncStatus('ok');
+      showToast('✓ Salvo na planilha!','success');
+    } else {
+      throw new Error(res?.erro || 'Resposta inválida');
+    }
+  } catch(e) {
+    console.error('SALVAR — erro:', e.message);
     ins._sincronizado=false; ins._pendente=true; setSyncStatus('error');
-    showToast('⚠️ Salvo localmente — sem conexão','error');
-  } finally { btn.disabled=false; btn.innerHTML='💾 Salvar inspeção'; }
+    showToast('⚠️ Erro: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled=false; btn.innerHTML='💾 Salvar inspeção'; }
+  }
 }
 
 async function reenviarPendentes() {
