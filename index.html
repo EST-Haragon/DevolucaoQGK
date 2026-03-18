@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="UTF-8">
-  <head>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>QGK · Devoluções</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -721,35 +722,33 @@ const CAMPOS = [
 // INIT
 function iniciarApp() {
   carregarHistorico(); renderHistorico();
-  // Carrega fontes salvas
-  const fontesSalvas = localStorage.getItem('qgk_dev_fontes');
-  if (fontesSalvas) {
+  // Carrega metadados de fontes anteriores (sem linhas — precisam ser reimportadas)
+  const metaSalva = localStorage.getItem('qgk_dev_fontes_meta');
+  if (metaSalva) {
     try {
-      fontes = JSON.parse(fontesSalvas);
-      if (fontes.length) {
+      const meta = JSON.parse(metaSalva);
+      if (meta.length) {
+        // Reconstrói fontes sem linhas — mostra aviso para reimportar
+        fontes = meta.map(m => ({ ...m, rows: [] }));
         renderFontesList();
-        atualizarBadgeCSV(); mostrarStatsImport(); setStep(2);
-        document.getElementById('cardBusca').style.display = 'block';
-        document.getElementById('btnProximo').style.display = 'block';
-        iniciarModo('manual');
+        atualizarBadgeCSV();
+        // Mostra aviso de reimportação necessária
+        const dz = document.getElementById('dropZone');
+        if (dz) {
+          const aviso = document.createElement('div');
+          aviso.id = 'avisoReimportar';
+          aviso.style.cssText = 'margin-top:10px;padding:10px 14px;background:var(--orange-bg);border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:var(--orange);font-weight:600;';
+          aviso.innerHTML = '⚠️ Reimporte os arquivos abaixo para continuar buscando (dados não persistem entre sessões)';
+          dz.parentNode.insertBefore(aviso, dz.nextSibling);
+        }
       }
     } catch(e) { fontes = []; }
   }
-  // Retrocompatibilidade: migra cache antigo
-  if (!fontes.length) {
-    const cc = localStorage.getItem('qgk_dev_csv');
-    const cm = localStorage.getItem('qgk_dev_colmap');
-    if (cc && cm) {
-      const rows = JSON.parse(cc);
-      const src  = localStorage.getItem('qgk_dev_source') || 'ml';
-      fontes = [{ id: Date.now(), nome: 'Importação anterior', source: src, rows, colMap: JSON.parse(cm) }];
-      salvarFontes();
-      renderFontesList(); atualizarBadgeCSV(); mostrarStatsImport(); setStep(2);
-      document.getElementById('cardBusca').style.display = 'block';
-      document.getElementById('btnProximo').style.display = 'block';
-      iniciarModo('manual');
-    }
-  }
+  // Limpa cache antigo de localStorage (que causava o erro de quota)
+  localStorage.removeItem('qgk_dev_csv');
+  localStorage.removeItem('qgk_dev_colmap');
+  localStorage.removeItem('qgk_dev_source');
+  localStorage.removeItem('qgk_dev_fontes');
   // Bloqueia o browser de abrir/baixar o arquivo se solto fora da drop zone
   document.addEventListener('dragover',  e => e.preventDefault());
   document.addEventListener('drop',      e => e.preventDefault());
@@ -988,6 +987,8 @@ function finalizarImport(rows) {
   mostrarStatsImport(); atualizarBadgeCSV(); setStep(2);
   document.getElementById('cardBusca').style.display = 'block';
   document.getElementById('btnProximo').style.display = 'block';
+  // Remove aviso de reimportação se existir
+  document.getElementById('avisoReimportar')?.remove();
   showToast(`✓ ${novaFonte.rows.length} pedidos adicionados!`, 'success');
   iniciarModo('manual');
   // Processa próximo arquivo se houver fila
@@ -997,7 +998,13 @@ function finalizarImport(rows) {
 }
 
 function salvarFontes() {
-  localStorage.setItem('qgk_dev_fontes', JSON.stringify(fontes));
+  // Salva só metadados — as linhas ficam em memória (muito grandes para localStorage)
+  const meta = fontes.map(f => ({ id: f.id, nome: f.nome, source: f.source, colMap: f.colMap, total: f.rows.length }));
+  try {
+    localStorage.setItem('qgk_dev_fontes_meta', JSON.stringify(meta));
+  } catch(e) {
+    console.warn('Erro ao salvar metadados:', e);
+  }
 }
 
 function removerFonte(id) {
@@ -1020,11 +1027,12 @@ function renderFontesList() {
   el.style.display = 'flex';
   el.innerHTML = fontes.map(f => {
     const label = f.source === 'ml' ? '🛒 ML' : '🛍 Shopee';
-    return `<div class="fonte-chip">
+    const semDados = f.rows.length === 0;
+    return `<div class="fonte-chip" style="${semDados?'opacity:.6':''}">
       <div class="fonte-chip-dot ${f.source}"></div>
       <div class="fonte-chip-info">
         <div class="fonte-chip-nome">${escHtml(f.nome)}</div>
-        <div class="fonte-chip-meta">${label} · ${f.rows.length} pedidos</div>
+        <div class="fonte-chip-meta">${label} · ${semDados ? '<span style="color:var(--orange)">⚠️ reimporte</span>' : f.rows.length + ' pedidos'}</div>
       </div>
       <button class="fonte-chip-remove" onclick="removerFonte(${f.id})" title="Remover">✕</button>
     </div>`;
