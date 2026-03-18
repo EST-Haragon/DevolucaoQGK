@@ -1129,6 +1129,8 @@ async function buscarPorCodigo(codigo) {
       const cmOrig = colMap, srcOrig = importSource;
       colMap = fonte.colMap; importSource = fonte.source;
       pedidoAtual = r;
+      pedidoAtual._colMap = fonte.colMap;    // guarda para o salvar
+      pedidoAtual._source = fonte.source;
       mostrarResultado(r, 'csv');
       colMap = cmOrig; importSource = srcOrig;
       mostrarFormulario(); setStep(3);
@@ -1302,9 +1304,12 @@ async function salvarInspecao() {
   if(!pedidoAtual)return;
   const inspector=document.getElementById('inputInspector').value.trim();
   if(!inspector){showToast('Informe quem fez a inspeção','error');return;}
-  const get=k=>colMap?.[k]?(pedidoAtual[colMap[k]]||''):'';
+  // Usa o colMap da fonte onde o pedido foi encontrado
+  const _cm = pedidoAtual._colMap || colMap;
+  const _src = pedidoAtual._source || importSource;
+  const get = k => pedidoAtual._origemSheets ? (pedidoAtual[k]||'') : (_cm?.[k] ? (pedidoAtual[_cm[k]]||'') : '');
   const ins={
-    id:Date.now(), timestamp:new Date().toISOString(), source:importSource,
+    id:Date.now(), timestamp:new Date().toISOString(), source:_src,
     pedido:get('pedido'), produto:get('produto'), sku:get('sku'),
     motivo:get('motivo'), comprador:get('comprador'), loja:get('loja'), data:get('data'),
     correto:toggles.correto, itensCompletos:toggles.itens,
@@ -1883,8 +1888,11 @@ async function buscarCodigoInspetor(codigo) {
       const colMapOriginal = colMap;
       colMap = fonte.colMap;
       importSource = fonte.source;
+      r._colMap = fonte.colMap;    // guarda para o salvar
+      r._source = fonte.source;
       mostrarResultadoIns(r, 'csv');
       colMap = colMapOriginal;
+      pedidoAtual = r;
       mostrarFormularioIns(); return;
     }
   }
@@ -1991,9 +1999,11 @@ async function salvarInspecaoInspetor() {
   if (!pedidoAtual) return;
   const inspector = document.getElementById('inputInspectorIns')?.value.trim();
   if (!inspector) { showToast('Informe quem fez a inspeção','error'); return; }
-  const get = k => pedidoAtual._origemSheets ? (pedidoAtual[k]||'') : (colMap?.[k]?(pedidoAtual[colMap[k]]||''):'');
+  const _cm = pedidoAtual._colMap || colMap;
+  const _src = pedidoAtual._source || importSource;
+  const get = k => pedidoAtual._origemSheets ? (pedidoAtual[k]||'') : (_cm?.[k] ? (pedidoAtual[_cm[k]]||'') : '');
   const ins = {
-    id: Date.now(), timestamp: new Date().toISOString(), source: importSource,
+    id: Date.now(), timestamp: new Date().toISOString(), source: _src,
     pedido: get('pedido'), produto: get('produto'), sku: get('sku'),
     motivo: get('motivo'), comprador: get('comprador'), loja: get('loja'), data: get('data'),
     correto: togglesIns.correto, itensCompletos: togglesIns.itens,
