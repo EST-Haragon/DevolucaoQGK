@@ -1028,7 +1028,21 @@ function finalizarImport(rows) {
   });
 }
 
-const CHUNK_SIZE = 200; // pedidos por requisição
+// Colunas essenciais a enviar — reduz tamanho da requisição drasticamente
+const COLUNAS_ESSENCIAIS = [
+  'ID do pedido', 'Status do pedido', 'Nome do Produto',
+  'Nº de referência do SKU principal', 'Número de referência SKU',
+  'Quantidade', 'Número de rastreamento', 'Status da Devolução / Reembolso',
+  'Cancelar Motivo', 'Nome de usuário (comprador)', 'Nome do destinatário',
+  'Data de criação do pedido', 'Hora completa do pedido',
+  // ML equivalentes
+  'numero_pedido','titulo','sku','quantidade','codigo_rastreio',
+  'motivo_cancelamento','comprador','data_aprovacao',
+  // genéricos
+  'Order ID','Product Name','SKU','Quantity','Tracking Number',
+];
+
+const CHUNK_SIZE = 10; // pequeno para caber na URL GET
 
 async function uploadParaPlanilha(rows, nomeFonte, onConcluido) {
   const progressEl = document.getElementById('uploadProgress');
@@ -1040,17 +1054,30 @@ async function uploadParaPlanilha(rows, nomeFonte, onConcluido) {
   progressEl.classList.add('active');
   infoEl.style.display = 'none';
 
-  const total  = rows.length;
+  // Filtra só colunas essenciais para reduzir tamanho
+  const hdrsEssenciais = csvHeaders.filter(h =>
+    COLUNAS_ESSENCIAIS.some(c => h.toLowerCase().includes(c.toLowerCase().substring(0, 8)))
+    || COLUNAS_ESSENCIAIS.includes(h)
+  );
+  // Garante pelo menos as primeiras 10 colunas se filtro muito restrito
+  const headers = hdrsEssenciais.length >= 3 ? hdrsEssenciais : csvHeaders.slice(0, 15);
+
+  // Projeta rows para só ter as colunas selecionadas
+  const rowsFiltradas = rows.map(r => {
+    const obj = {};
+    headers.forEach(h => { obj[h] = r[h] || ''; });
+    return obj;
+  });
+
+  const total  = rowsFiltradas.length;
   const chunks = Math.ceil(total / CHUNK_SIZE);
   let inseridos = 0;
-
-  // Extrai cabeçalhos do colMap para enviar ao Sheets
-  const headers = csvHeaders;
+  let erros = 0;
 
   for (let c = 0; c < chunks; c++) {
     const inicio = c * CHUNK_SIZE;
     const fim    = Math.min(inicio + CHUNK_SIZE, total);
-    const chunk  = rows.slice(inicio, fim);
+    const chunk  = rowsFiltradas.slice(inicio, fim);
     const pct    = Math.round((c / chunks) * 100);
 
     barEl.style.width  = pct + '%';
@@ -1058,32 +1085,46 @@ async function uploadParaPlanilha(rows, nomeFonte, onConcluido) {
     statusEl.textContent = `Enviando ${inicio + 1}–${fim} de ${total}...`;
 
     try {
-      const res = await jsonpRequest({
+      // Usa fetch POST para evitar limite de URL do JSONP
+      const params = new URLSearchParams({
         action:   'importarPedidosChunk',
         data:     JSON.stringify(chunk),
         headers:  c === 0 ? JSON.stringify(headers) : '',
-        primeiro: c === 0 ? 'true' : 'false',
-        reset:    c === 0 ? 'false' : 'false', // nunca resetar — só adiciona novos
+        primeiro: String(c === 0),
+        reset:    'false',
       });
+      const resp = await fetch(APPS_SCRIPT_URL, {
+        method:   'POST',
+        body:     params,
+        redirect: 'follow',
+      });
+      const text = await resp.text();
+      // Apps Script retorna JSONP — extrai o JSON
+      const json = text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, '');
+      const res  = JSON.parse(json);
       if (res && res.inseridos !== undefined) inseridos += res.inseridos;
     } catch(e) {
-      showToast(`Erro no chunk ${c+1}: ${e.message}`, 'error');
-      progressEl.classList.remove('active');
-      return;
+      erros++;
+      console.warn(`Chunk ${c+1} falhou:`, e.message);
+      if (erros > 5) {
+        showToast(`Muitos erros — upload interrompido no pedido ${inicio}`, 'error');
+        progressEl.classList.remove('active');
+        return;
+      }
     }
 
-    // Pequena pausa para não sobrecarregar o Apps Script
-    await new Promise(r => setTimeout(r, 300));
+    // Pausa entre chunks para não sobrecarregar
+    await new Promise(r => setTimeout(r, 500));
   }
 
   barEl.style.width  = '100%';
   pctEl.textContent  = '100%';
-  statusEl.textContent = 'Concluído!';
+  statusEl.textContent = erros > 0 ? `Concluído com ${erros} erros` : 'Concluído!';
 
   setTimeout(() => progressEl.classList.remove('active'), 2000);
 
   infoEl.style.display = 'block';
-  infoEl.textContent = `✓ ${inseridos} pedidos novos adicionados à planilha (${total - inseridos} já existiam)`;
+  infoEl.textContent = `✓ ${inseridos} pedidos novos na planilha${erros > 0 ? ` (${erros} chunks falharam)` : ''}`;
 
   showToast(`✓ Upload concluído! ${inseridos} novos pedidos`, 'success');
   if (onConcluido) onConcluido();
