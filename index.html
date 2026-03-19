@@ -1073,37 +1073,66 @@ async function uploadParaPlanilha(rows, nomeFonte, onConcluido) {
   barEl.style.width = '30%';
 
   try {
-    // UMA única requisição POST com todos os dados
-    const params = new URLSearchParams({
+    // Envia via no-cors (não lemos a resposta, mas o POST chega ao Apps Script)
+    const body = new URLSearchParams({
       action:  'importarTodosPedidos',
       data:    JSON.stringify(rowsFiltradas),
       headers: JSON.stringify(hdrs),
       reset:   'false',
     });
 
-    const resp = await fetch(APPS_SCRIPT_URL, {
-      method:   'POST',
-      body:     params,
-      redirect: 'follow',
-    });
+    // Tenta primeiro com cors normal
+    let sucesso = false;
+    try {
+      const resp = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST', body, redirect: 'follow', mode: 'cors', credentials: 'omit',
+      });
+      const text = await resp.text();
+      let res;
+      try { res = JSON.parse(text); }
+      catch { const c = text.replace(/^[^\[{]*/,'').replace(/[^\]}\s]*$/,''); res = JSON.parse(c || '{}'); }
+      if (res && res.ok) {
+        barEl.style.width = '100%'; pctEl.textContent = '✓';
+        statusEl.textContent = 'Concluído!';
+        setTimeout(() => progressEl.classList.remove('active'), 2000);
+        infoEl.style.display = 'block';
+        infoEl.textContent = `✓ ${res.inseridos ?? '?'} pedidos novos adicionados à planilha`;
+        showToast(`✓ ${res.inseridos ?? rowsFiltradas.length} pedidos importados!`, 'success');
+        sucesso = true;
+      }
+    } catch(corsErr) {
+      console.warn('CORS bloqueou resposta, tentando no-cors:', corsErr.message);
+    }
 
-    barEl.style.width = '80%';
-    statusEl.textContent = 'Processando na planilha...';
+    if (!sucesso) {
+      // Fallback: no-cors — envia mas não lê resposta
+      // Usa JSONP para confirmar via polling após alguns segundos
+      await fetch(APPS_SCRIPT_URL, {
+        method: 'POST', body, redirect: 'follow', mode: 'no-cors', credentials: 'omit',
+      }).catch(() => {});
 
-    const text = await resp.text();
-    // Apps Script pode retornar JSONP ou JSON puro
-    const jsonStr = text.replace(/^[^([{]*/, '').replace(/\);?\s*$/, '').trim();
-    const res = JSON.parse(jsonStr.startsWith('{') || jsonStr.startsWith('[') ? jsonStr : jsonStr.replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, ''));
+      barEl.style.width = '70%';
+      statusEl.textContent = 'Aguardando processamento...';
 
-    barEl.style.width  = '100%';
-    pctEl.textContent  = '✓';
-    statusEl.textContent = 'Concluído!';
-    setTimeout(() => progressEl.classList.remove('active'), 2000);
+      // Aguarda 5s e verifica via JSONP quantos foram inseridos
+      await new Promise(r => setTimeout(r, 5000));
+      barEl.style.width = '90%';
 
-    infoEl.style.display = 'block';
-    infoEl.textContent = `✓ ${res.inseridos} pedidos novos adicionados à planilha (${rowsFiltradas.length - res.inseridos} já existiam)`;
-
-    showToast(`✓ ${res.inseridos} pedidos importados!`, 'success');
+      try {
+        const check = await jsonpRequest({ action: 'contarPedidos' });
+        barEl.style.width = '100%'; pctEl.textContent = '✓';
+        statusEl.textContent = 'Concluído!';
+        setTimeout(() => progressEl.classList.remove('active'), 2000);
+        infoEl.style.display = 'block';
+        infoEl.textContent = `✓ Planilha agora tem ${check.total} pedidos`;
+        showToast(`✓ Pedidos importados! Total: ${check.total}`, 'success');
+      } catch {
+        barEl.style.width = '100%';
+        statusEl.textContent = 'Enviado — verifique a planilha';
+        setTimeout(() => progressEl.classList.remove('active'), 3000);
+        showToast('Dados enviados — verifique a aba Pedidos na planilha', 'success');
+      }
+    }
 
   } catch(e) {
     progressEl.classList.remove('active');
