@@ -328,6 +328,14 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
 .fonte-chip-remove { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border2); background: white; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--red); transition: background 0.12s; }
 .fonte-chip-remove:hover { background: var(--red-bg); }
 
+
+/* UPLOAD PROGRESS */
+.upload-progress { display:none; margin-top:14px; }
+.upload-progress.active { display:block; }
+.upload-progress-bar-wrap { height:8px; background:var(--bg); border-radius:4px; overflow:hidden; margin-bottom:6px; }
+.upload-progress-bar { height:100%; background:var(--accent); border-radius:4px; transition:width 0.3s ease; width:0%; }
+.upload-progress-text { font-size:11px; color:var(--text3); font-family:'DM Mono',monospace; display:flex; justify-content:space-between; }
+
 </style>
 </head>
 <body>
@@ -455,6 +463,23 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
       <div class="stat-mini"><div class="stat-mini-val" style="color:var(--blue)" id="statArquivos">0</div><div class="stat-mini-label">Arquivos</div></div>
       <div class="stat-mini"><div class="stat-mini-val" style="color:var(--red)" id="statMotivos">0</div><div class="stat-mini-label">Motivos</div></div>
     </div>
+    <!-- Progress de upload -->
+    <div class="upload-progress" id="uploadProgress">
+      <div class="upload-progress-bar-wrap">
+        <div class="upload-progress-bar" id="uploadBar"></div>
+      </div>
+      <div class="upload-progress-text">
+        <span id="uploadStatus">Preparando...</span>
+        <span id="uploadPct">0%</span>
+      </div>
+    </div>
+
+    <!-- Info planilha -->
+    <div id="infoPlanilha" style="display:none;margin-top:12px;padding:10px 14px;background:var(--green-bg);border:1px solid #6ee7b7;border-radius:8px;font-size:12px;color:var(--green);font-weight:600;"></div>
+    <div style="margin-top:8px;display:none" id="btnVerPedidos">
+      <button class="btn-ghost" style="width:100%;font-size:12px" onclick="verificarPedidosPlanilha()">🔢 Ver total na planilha</button>
+    </div>
+
     <div style="margin-top:12px;display:none" id="btnProximo">
       <button class="btn-primary" style="width:100%" onclick="irParaBusca()">Buscar pedido →</button>
     </div>
@@ -761,6 +786,9 @@ function iniciarApp() {
   dz.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag-over'); processarArquivos(Array.from(e.dataTransfer.files)); });
   sincronizarHistorico();
   setTimeout(reenviarPendentes, 5000);
+  // Verifica quantos pedidos há na planilha ao abrir
+  verificarPedidosPlanilha();
+  document.getElementById('btnVerPedidos').style.display = 'block';
 }
 
 window.addEventListener('load', () => {
@@ -972,29 +1000,93 @@ function confirmarMapeamento() {
 function fecharModal() { document.getElementById('modalColunas').classList.remove('open'); }
 
 function finalizarImport(rows) {
-  // Cria nova fonte com os dados passados
   const pend = _arquivoPendente;
-  const novaFonte = {
-    id:     Date.now(),
-    nome:   pend?.file?.name || 'Importação',
-    source: importSource,
-    rows:   rows || [],
-    colMap: { ...colMap },
-  };
-  fontes.push(novaFonte);
-  salvarFontes();
-  renderFontesList();
-  mostrarStatsImport(); atualizarBadgeCSV(); setStep(2);
-  document.getElementById('cardBusca').style.display = 'block';
-  document.getElementById('btnProximo').style.display = 'block';
-  // Remove aviso de reimportação se existir
-  document.getElementById('avisoReimportar')?.remove();
-  showToast(`✓ ${novaFonte.rows.length} pedidos adicionados!`, 'success');
-  iniciarModo('manual');
-  // Processa próximo arquivo se houver fila
-  const cb = pend?.onDone;
-  _arquivoPendente = null;
-  if (cb) cb();
+  const nomeFonte = pend?.file?.name || 'Importação';
+
+  // Inicia upload para planilha em chunks
+  uploadParaPlanilha(rows, nomeFonte, () => {
+    // Callback após upload completo
+    const novaFonte = {
+      id:     Date.now(),
+      nome:   nomeFonte,
+      source: importSource,
+      rows:   [], // não guarda em memória
+      colMap: { ...colMap },
+      total:  rows.length,
+    };
+    fontes.push(novaFonte);
+    salvarFontes();
+    renderFontesList();
+    mostrarStatsImport(); atualizarBadgeCSV(); setStep(2);
+    document.getElementById('cardBusca').style.display = 'block';
+    document.getElementById('btnProximo').style.display = 'block';
+    document.getElementById('avisoReimportar')?.remove();
+    iniciarModo('manual');
+    const cb = pend?.onDone;
+    _arquivoPendente = null;
+    if (cb) cb();
+  });
+}
+
+const CHUNK_SIZE = 200; // pedidos por requisição
+
+async function uploadParaPlanilha(rows, nomeFonte, onConcluido) {
+  const progressEl = document.getElementById('uploadProgress');
+  const barEl      = document.getElementById('uploadBar');
+  const statusEl   = document.getElementById('uploadStatus');
+  const pctEl      = document.getElementById('uploadPct');
+  const infoEl     = document.getElementById('infoPlanilha');
+
+  progressEl.classList.add('active');
+  infoEl.style.display = 'none';
+
+  const total  = rows.length;
+  const chunks = Math.ceil(total / CHUNK_SIZE);
+  let inseridos = 0;
+
+  // Extrai cabeçalhos do colMap para enviar ao Sheets
+  const headers = csvHeaders;
+
+  for (let c = 0; c < chunks; c++) {
+    const inicio = c * CHUNK_SIZE;
+    const fim    = Math.min(inicio + CHUNK_SIZE, total);
+    const chunk  = rows.slice(inicio, fim);
+    const pct    = Math.round((c / chunks) * 100);
+
+    barEl.style.width  = pct + '%';
+    pctEl.textContent  = pct + '%';
+    statusEl.textContent = `Enviando ${inicio + 1}–${fim} de ${total}...`;
+
+    try {
+      const res = await jsonpRequest({
+        action:   'importarPedidosChunk',
+        data:     JSON.stringify(chunk),
+        headers:  c === 0 ? JSON.stringify(headers) : '',
+        primeiro: c === 0 ? 'true' : 'false',
+        reset:    c === 0 ? 'false' : 'false', // nunca resetar — só adiciona novos
+      });
+      if (res && res.inseridos !== undefined) inseridos += res.inseridos;
+    } catch(e) {
+      showToast(`Erro no chunk ${c+1}: ${e.message}`, 'error');
+      progressEl.classList.remove('active');
+      return;
+    }
+
+    // Pequena pausa para não sobrecarregar o Apps Script
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  barEl.style.width  = '100%';
+  pctEl.textContent  = '100%';
+  statusEl.textContent = 'Concluído!';
+
+  setTimeout(() => progressEl.classList.remove('active'), 2000);
+
+  infoEl.style.display = 'block';
+  infoEl.textContent = `✓ ${inseridos} pedidos novos adicionados à planilha (${total - inseridos} já existiam)`;
+
+  showToast(`✓ Upload concluído! ${inseridos} novos pedidos`, 'success');
+  if (onConcluido) onConcluido();
 }
 
 function salvarFontes() {
@@ -1108,74 +1200,72 @@ function processarCodigo(code) {
 function buscarPedido() { const c=document.getElementById('inputCodigo').value.trim(); if(c)buscarPorCodigo(c); }
 
 async function buscarPorCodigo(codigo) {
-  const notFound      = document.getElementById('notFound');
-  const buscandoEl    = document.getElementById('buscandoSheets');
-  const resultCard    = document.getElementById('resultCard');
+  const notFound   = document.getElementById('notFound');
+  const buscandoEl = document.getElementById('buscandoSheets');
+  const resultCard = document.getElementById('resultCard');
 
-  // Limpa estado anterior
   notFound.style.display = 'none';
   buscandoEl.style.display = 'none';
   resultCard.classList.remove('visible');
   document.getElementById('cardInspect').style.display = 'none';
 
-  const norm = s => String(s).toLowerCase().trim()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
-  const n = norm(codigo);
-
-  // ── 1. Busca em cada fonte separadamente (mantém origem) ──────────────
-  for (const fonte of fontes) {
-    const r = fonte.rows.find(row => Object.values(row).some(v => norm(v).includes(n)));
-    if (r) {
-      const cmOrig = colMap, srcOrig = importSource;
-      colMap = fonte.colMap; importSource = fonte.source;
-      pedidoAtual = r;
-      pedidoAtual._colMap = fonte.colMap;    // guarda para o salvar
-      pedidoAtual._source = fonte.source;
-      mostrarResultado(r, 'csv');
-      colMap = cmOrig; importSource = srcOrig;
-      mostrarFormulario(); setStep(3);
-      setTimeout(()=>document.getElementById('cardInspect').scrollIntoView({behavior:'smooth'}),100);
-      return;
-    }
-  }
-
-  // ── 2. Não achou no CSV → tenta na planilha (Sheets) ────────────────────
+  // Busca direto na planilha Google Sheets
   buscandoEl.style.display = 'flex';
   try {
-    const res = await jsonpRequest({ action: 'buscarPedidoDevolucao', codigo });
+    const res = await jsonpRequest({ action: 'buscarPedido', codigo });
     buscandoEl.style.display = 'none';
 
     if (res && res.encontrado) {
-      // Converte resultado da planilha para o formato de pedidoAtual
       pedidoAtual = res.dados;
       pedidoAtual._origemSheets = true;
-      if (res.jaInspecionado) pedidoAtual._jaInspecionado = true;
+      pedidoAtual._cabecalhos   = res.cabecalhos;
+      // Verifica se já foi inspecionado
+      const resInsp = await jsonpRequest({ action: 'buscarPedidoDevolucao', codigo });
+      if (resInsp && resInsp.jaInspecionado) pedidoAtual._jaInspecionado = true;
       mostrarResultado(pedidoAtual, 'sheets');
       mostrarFormulario(); setStep(3);
       setTimeout(()=>document.getElementById('cardInspect').scrollIntoView({behavior:'smooth'}),100);
     } else {
       notFound.style.display = 'block';
-      document.getElementById('notFoundCode').textContent = codigo;
+      document.getElementById('notFoundCode').textContent = codigo + ' — não encontrado na planilha';
       pedidoAtual = null;
     }
   } catch(e) {
     buscandoEl.style.display = 'none';
-    // Falhou a consulta ao Sheets — mostra não encontrado com aviso
     notFound.style.display = 'block';
-    document.getElementById('notFoundCode').textContent =
-      csvRows.length
-        ? codigo + ' (planilha indisponível)'
-        : codigo + ' — importe um CSV ou verifique a conexão';
+    document.getElementById('notFoundCode').textContent = codigo + ' (erro: ' + e.message + ')';
     pedidoAtual = null;
   }
 }
 
 // RESULTADO
 function mostrarResultado(row, origem) {
-  // Se veio do Sheets, campos já estão normalizados com nomes fixos
-  // Se veio do CSV, usa o mapeamento colMap
+  // Mapeia campos da planilha usando os nomes reais das colunas da Shopee/ML
   const get = k => {
-    if (row._origemSheets) return row[k] || '—';
+    if (!row) return '—';
+    // Origem Sheets: usa mapeamento por nome de coluna real
+    if (row._origemSheets) {
+      const mapa = {
+        pedido:    ['ID do pedido','Order ID','Número do pedido','id_pedido'],
+        produto:   ['Nome do Produto','Product Name','nome_produto','Título'],
+        sku:       ['Nº de referência do SKU principal','SKU','sku','Código SKU','ID do anúncio'],
+        motivo:    ['Status da Devolução / Reembolso','Cancelar Motivo','Motivo','motivo'],
+        comprador: ['Nome de usuário (comprador)','Comprador','buyer','nome_comprador','Nome do comprador'],
+        loja:      ['Nome da loja','Loja','loja','Conta'],
+        data:      ['Data de criação do pedido','Hora completa do pedido','Data','data_pedido'],
+        rastreio:  ['Número de rastreamento','Código de rastreio','rastreamento'],
+        quantidade:['Quantidade','quantity','qtd'],
+      };
+      const candidatos = mapa[k] || [];
+      for (const c of candidatos) {
+        if (row[c] !== undefined && row[c] !== '') return row[c];
+      }
+      // Fallback: procura chave parcial
+      const kn = k.toLowerCase();
+      const found = Object.entries(row).find(([col]) => col.toLowerCase().includes(kn));
+      return found ? found[1] : '—';
+    }
+    // Origem CSV local (colMap)
     return colMap?.[k] ? (row[colMap[k]]||'—') : '—';
   };
   const motivo = get('motivo'), mc = classMot(motivo);
@@ -1190,13 +1280,17 @@ function mostrarResultado(row, origem) {
   const origemLabel = origem==='sheets' ? '☁ Planilha' : importSource==='ml'?'🛒 ML':'🛍 Shopee';
   document.getElementById('resultSource').textContent = origemLabel;
   document.getElementById('resultTitle').textContent = `Pedido ${get('pedido')}`;
+  const rastreio   = get('rastreio');
+  const quantidade = get('quantidade');
   document.getElementById('resultFields').innerHTML = [
-    ['Pedido',    `<span style="font-family:'DM Mono',monospace">${get('pedido')}</span>`],
-    ['SKU',       `<span style="font-family:'DM Mono',monospace">${get('sku')}</span>`],
-    ['Comprador', get('comprador')],
-    ['Motivo',    `<span class="motivo-tag ${mc}">${motEmoji(mc)} ${motivo}</span>`],
-    get('loja')!=='—'?['Loja',get('loja')]:null,
-    get('data')!=='—'?['Data',get('data')]:null,
+    ['Pedido',     `<span style="font-family:'DM Mono',monospace">${get('pedido')}</span>`],
+    ['SKU',        `<span style="font-family:'DM Mono',monospace">${get('sku')}</span>`],
+    quantidade!=='—'?['Quantidade', `<strong>${quantidade}</strong>`]:null,
+    ['Comprador',  get('comprador')],
+    rastreio!=='—'?['Rastreio', `<span style="font-family:'DM Mono',monospace">${rastreio}</span>`]:null,
+    ['Motivo',     `<span class="motivo-tag ${mc}">${motEmoji(mc)} ${motivo}</span>`],
+    get('loja')!=='—'?['Loja', get('loja')]:null,
+    get('data')!=='—'?['Data', get('data')]:null,
   ].filter(Boolean).map(([k,v])=>`<div class="result-field"><div class="result-field-key">${k}</div><div class="result-field-val">${v}</div></div>`).join('');
   document.getElementById('resultCard').classList.add('visible');
   // Aviso se pedido já foi inspecionado antes
@@ -1896,46 +1990,57 @@ async function buscarCodigoInspetor(codigo) {
     .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
   const n = norm(codigo);
 
-  // 1. Busca em cada fonte separadamente
-  for (const fonte of fontes) {
-    const r = fonte.rows.find(row => Object.values(row).some(v => norm(v).includes(n)));
-    if (r) {
-      const colMapOriginal = colMap;
-      colMap = fonte.colMap;
-      importSource = fonte.source;
-      r._colMap = fonte.colMap;    // guarda para o salvar
-      r._source = fonte.source;
-      mostrarResultadoIns(r, 'csv');
-      colMap = colMapOriginal;
-      pedidoAtual = r;
-      mostrarFormularioIns(); return;
-    }
-  }
-
-  // 2. Planilha
+  // Busca direto na planilha Google Sheets
   buscEl.style.display = 'flex';
   try {
-    const res = await jsonpRequest({ action: 'buscarPedidoDevolucao', codigo });
+    const res = await jsonpRequest({ action: 'buscarPedido', codigo });
     buscEl.style.display = 'none';
     if (res && res.encontrado) {
       res.dados._origemSheets = true;
-      if (res.jaInspecionado) res.dados._jaInspecionado = true;
+      res.dados._cabecalhos   = res.cabecalhos;
+      // Verifica duplicata
+      try {
+        const resInsp = await jsonpRequest({ action: 'buscarPedidoDevolucao', codigo });
+        if (resInsp && resInsp.jaInspecionado) res.dados._jaInspecionado = true;
+      } catch {}
+      pedidoAtual = res.dados;
       mostrarResultadoIns(res.dados, 'sheets');
       mostrarFormularioIns();
     } else {
       nfEl.style.display = 'block';
-      document.getElementById('notFoundCodeIns').textContent =
-        fontes.length ? codigo : codigo + ' — importe um CSV ou verifique a conexão';
+      document.getElementById('notFoundCodeIns').textContent = codigo + ' — não encontrado na planilha';
     }
-  } catch {
+  } catch(e) {
     buscEl.style.display = 'none';
     nfEl.style.display = 'block';
-    document.getElementById('notFoundCodeIns').textContent = codigo + ' (planilha indisponível)';
+    document.getElementById('notFoundCodeIns').textContent = codigo + ' (erro: ' + e.message + ')';
   }
 }
 
 function mostrarResultadoIns(row, origem) {
-  const get = k => row._origemSheets ? (row[k]||'—') : (colMap?.[k] ? (row[colMap[k]]||'—') : '—');
+  const get = k => {
+    if (!row) return '—';
+    if (row._origemSheets) {
+      const mapa = {
+        pedido:    ['ID do pedido','Order ID','Número do pedido'],
+        produto:   ['Nome do Produto','Product Name','Título'],
+        sku:       ['Nº de referência do SKU principal','SKU','Código SKU'],
+        motivo:    ['Status da Devolução / Reembolso','Cancelar Motivo','Motivo'],
+        comprador: ['Nome de usuário (comprador)','Comprador','Nome do comprador'],
+        loja:      ['Nome da loja','Loja','Conta'],
+        data:      ['Data de criação do pedido','Hora completa do pedido','Data'],
+        rastreio:  ['Número de rastreamento','Código de rastreio'],
+        quantidade:['Quantidade','quantity'],
+      };
+      const candidatos = mapa[k] || [];
+      for (const c of candidatos) {
+        if (row[c] !== undefined && row[c] !== '') return row[c];
+      }
+      const found = Object.entries(row).find(([col]) => col.toLowerCase().includes(k.toLowerCase()));
+      return found ? found[1] : '—';
+    }
+    return colMap?.[k] ? (row[colMap[k]]||'—') : '—';
+  };
   const motivo = get('motivo'), mc = classMot(motivo);
   const el = document.getElementById('resultProdutoIns');
   const nome = get('produto');
@@ -1947,13 +2052,17 @@ function mostrarResultadoIns(row, origem) {
   }
   document.getElementById('resultSourceIns').textContent = origem==='sheets'?'☁ Planilha':importSource==='ml'?'🛒 ML':'🛍 Shopee';
   document.getElementById('resultTitleIns').textContent = `Pedido ${get('pedido')}`;
+  const rastreioIns   = get('rastreio');
+  const quantidadeIns = get('quantidade');
   document.getElementById('resultFieldsIns').innerHTML = [
-    ['Pedido',    `<span style="font-family:'DM Mono',monospace">${get('pedido')}</span>`],
-    ['SKU',       `<span style="font-family:'DM Mono',monospace">${get('sku')}</span>`],
-    ['Comprador', get('comprador')],
-    ['Motivo',    `<span class="motivo-tag ${mc}">${motEmoji(mc)} ${motivo}</span>`],
-    get('loja')!=='—'?['Loja',get('loja')]:null,
-    get('data')!=='—'?['Data',get('data')]:null,
+    ['Pedido',     `<span style="font-family:'DM Mono',monospace">${get('pedido')}</span>`],
+    ['SKU',        `<span style="font-family:'DM Mono',monospace">${get('sku')}</span>`],
+    quantidadeIns!=='—'?['Quantidade', `<strong>${quantidadeIns}</strong>`]:null,
+    ['Comprador',  get('comprador')],
+    rastreioIns!=='—'?['Rastreio', `<span style="font-family:'DM Mono',monospace">${rastreioIns}</span>`]:null,
+    ['Motivo',     `<span class="motivo-tag ${mc}">${motEmoji(mc)} ${motivo}</span>`],
+    get('loja')!=='—'?['Loja', get('loja')]:null,
+    get('data')!=='—'?['Data', get('data')]:null,
   ].filter(Boolean).map(([k,v])=>`<div class="result-field"><div class="result-field-key">${k}</div><div class="result-field-val">${v}</div></div>`).join('');
   const aviso = document.getElementById('avisoJaInspecionadoIns');
   if (aviso) aviso.style.display = row._jaInspecionado ? 'block' : 'none';
@@ -2083,6 +2192,28 @@ async function testarConexao() {
       btn.textContent = '🔌 Testar';
       btn.style.color = '';
     }, 5000);
+  }
+}
+
+
+// ═══════════════════════════════════════════
+// VERIFICAR PEDIDOS NA PLANILHA
+// ═══════════════════════════════════════════
+async function verificarPedidosPlanilha() {
+  try {
+    const res = await jsonpRequest({ action: 'contarPedidos' });
+    if (res && res.ok) {
+      const infoEl = document.getElementById('infoPlanilha');
+      infoEl.style.display = 'block';
+      infoEl.textContent = `☁ Planilha tem ${res.total} pedidos cadastrados`;
+      if (res.total > 0) {
+        document.getElementById('cardBusca').style.display = 'block';
+        document.getElementById('btnProximo').style.display = 'block';
+        setStep(2);
+      }
+    }
+  } catch(e) {
+    showToast('Erro ao verificar planilha: ' + e.message, 'error');
   }
 }
 
