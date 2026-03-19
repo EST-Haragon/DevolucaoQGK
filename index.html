@@ -1042,7 +1042,7 @@ const COLUNAS_ESSENCIAIS = [
   'Order ID','Product Name','SKU','Quantity','Tracking Number',
 ];
 
-const CHUNK_SIZE = 10; // pequeno para caber na URL GET
+const CHUNK_SIZE = 50; // 50 por chunk com POST
 
 async function uploadParaPlanilha(rows, nomeFonte, onConcluido) {
   const progressEl = document.getElementById('uploadProgress');
@@ -1113,8 +1113,8 @@ async function uploadParaPlanilha(rows, nomeFonte, onConcluido) {
       }
     }
 
-    // Pausa entre chunks para não sobrecarregar
-    await new Promise(r => setTimeout(r, 500));
+    // Pausa entre chunks
+    await new Promise(r => setTimeout(r, 800));
   }
 
   barEl.style.width  = '100%';
