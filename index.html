@@ -442,48 +442,60 @@ button { font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; bord
     <div class="card-header">
       <div>
         <div class="card-title">📂 Importar relatórios</div>
-        <div class="card-sub">Adicione um ou mais arquivos — CSV ou Excel</div>
+        <div class="card-sub">Via Google Drive</div>
       </div>
     </div>
+
+    <!-- Instrução -->
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px;padding:10px 14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);line-height:1.6">
+      1. Faça upload do arquivo para a pasta <strong>QGK-Importacao</strong> no Google Drive<br>
+      2. Selecione a plataforma abaixo<br>
+      3. Clique em <strong>Buscar arquivos</strong>
+    </div>
+
     <div class="tab-row">
       <button class="tab-btn active" onclick="setImportSource('ml',this)">Mercado Livre</button>
       <button class="tab-btn" onclick="setImportSource('shopee',this)">Shopee</button>
     </div>
-    <div class="drop-zone" id="dropZone" onclick="document.getElementById('csvInput').click()">
-      <div class="drop-zone-icon">📄</div>
-      <div class="drop-zone-text">Clique ou arraste arquivos aqui</div>
-      <div class="drop-zone-sub" id="dropSub">CSV ou Excel (.xlsx) — múltiplos arquivos aceitos</div>
-      <input type="file" id="csvInput" accept=".csv,.txt,.xlsx,.xls" multiple style="display:none" onchange="handleFileSelect(event)">
+
+    <!-- Lista de arquivos encontrados na pasta -->
+    <div id="listaArquivos" style="display:none;margin-bottom:12px;flex-direction:column;gap:6px"></div>
+
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn-ghost" style="flex:1" onclick="buscarArquivosPasta()">
+        🔍 Buscar arquivos na pasta
+      </button>
+      <button class="btn-ghost" style="font-size:11px;padding:6px 10px" onclick="verificarPedidosPlanilha()">
+        🔢 Total
+      </button>
     </div>
-    <!-- Lista de fontes importadas -->
-    <div class="fontes-list" id="fontesList" style="display:none"></div>
-    <!-- Stats totais -->
-    <div class="stats-row" id="importStats" style="display:none">
-      <div class="stat-mini"><div class="stat-mini-val" id="statTotal">0</div><div class="stat-mini-label">Total</div></div>
-      <div class="stat-mini"><div class="stat-mini-val" style="color:var(--blue)" id="statArquivos">0</div><div class="stat-mini-label">Arquivos</div></div>
-      <div class="stat-mini"><div class="stat-mini-val" style="color:var(--red)" id="statMotivos">0</div><div class="stat-mini-label">Motivos</div></div>
-    </div>
-    <!-- Progress de upload -->
+
+    <!-- Progress -->
     <div class="upload-progress" id="uploadProgress">
       <div class="upload-progress-bar-wrap">
         <div class="upload-progress-bar" id="uploadBar"></div>
       </div>
       <div class="upload-progress-text">
-        <span id="uploadStatus">Preparando...</span>
-        <span id="uploadPct">0%</span>
+        <span id="uploadStatus">Aguardando...</span>
+        <span id="uploadPct"></span>
       </div>
     </div>
 
-    <!-- Info planilha -->
+    <!-- Info resultado -->
     <div id="infoPlanilha" style="display:none;margin-top:12px;padding:10px 14px;background:var(--green-bg);border:1px solid #6ee7b7;border-radius:8px;font-size:12px;color:var(--green);font-weight:600;"></div>
-    <div style="margin-top:8px;display:none" id="btnVerPedidos">
-      <button class="btn-ghost" style="width:100%;font-size:12px" onclick="verificarPedidosPlanilha()">🔢 Ver total na planilha</button>
+
+    <!-- Stats -->
+    <div class="stats-row" id="importStats" style="display:none;margin-top:12px">
+      <div class="stat-mini"><div class="stat-mini-val" id="statTotal">0</div><div class="stat-mini-label">Na planilha</div></div>
+      <div class="stat-mini"><div class="stat-mini-val" style="color:var(--blue)" id="statArquivos">0</div><div class="stat-mini-label">Arquivos</div></div>
+      <div class="stat-mini"><div class="stat-mini-val" style="color:var(--green)" id="statMotivos">—</div><div class="stat-mini-label">Inseridos</div></div>
     </div>
 
     <div style="margin-top:12px;display:none" id="btnProximo">
       <button class="btn-primary" style="width:100%" onclick="irParaBusca()">Buscar pedido →</button>
     </div>
   </div>
+
 
   <!-- MODAL MAPEAMENTO -->
   <div class="modal-overlay" id="modalColunas">
@@ -2269,6 +2281,143 @@ async function verificarPedidosPlanilha() {
     }
   } catch(e) {
     showToast('Erro ao verificar planilha: ' + e.message, 'error');
+  }
+}
+
+
+// ═══════════════════════════════════════════
+// IMPORTAÇÃO VIA GOOGLE DRIVE
+// ═══════════════════════════════════════════
+let PASTA_ID = localStorage.getItem('qgk_dev_pasta_id') || '';
+
+async function buscarArquivosPasta() {
+  const btn = document.querySelector('[onclick="buscarArquivosPasta()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Buscando...'; }
+
+  // Se não tem pasta configurada, pede o ID
+  if (!PASTA_ID) {
+    const id = prompt('Cole o ID da pasta QGK-Importacao do Google Drive:');
+    if (!id || !id.trim()) {
+      if (btn) { btn.disabled = false; btn.textContent = '🔍 Buscar arquivos na pasta'; }
+      return;
+    }
+    PASTA_ID = id.trim();
+    localStorage.setItem('qgk_dev_pasta_id', PASTA_ID);
+  }
+
+  try {
+    const res = await jsonpRequest({ action: 'listarArquivosPasta', pastaId: PASTA_ID });
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Buscar arquivos na pasta'; }
+
+    if (res.erro) {
+      showToast('Erro: ' + res.erro, 'error');
+      // Reseta pasta para permitir reconfigurar
+      if (res.erro.includes('pasta') || res.erro.includes('permiss')) {
+        PASTA_ID = '';
+        localStorage.removeItem('qgk_dev_pasta_id');
+      }
+      return;
+    }
+
+    renderListaArquivos(res.arquivos || []);
+
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Buscar arquivos na pasta'; }
+    showToast('Erro ao buscar arquivos: ' + e.message, 'error');
+  }
+}
+
+function renderListaArquivos(arquivos) {
+  const el = document.getElementById('listaArquivos');
+  if (!arquivos.length) {
+    el.style.display = 'flex';
+    el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:10px;text-align:center">Nenhum arquivo Excel/CSV encontrado na pasta</div>';
+    return;
+  }
+  el.style.display = 'flex';
+  el.innerHTML = arquivos.map(f => {
+    const dt = new Date(f.modificado).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">
+      <span style="font-size:18px">📄</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(f.nome)}</div>
+        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace">${dt} · ${f.tamanhoKB}KB</div>
+      </div>
+      <button class="btn-primary" style="font-size:11px;padding:6px 12px;flex-shrink:0"
+        onclick="importarArquivoDrive('${f.id}','${escHtml(f.nome)}')">
+        ⬆ Importar
+      </button>
+    </div>`;
+  }).join('');
+}
+
+async function importarArquivoDrive(fileId, nomeArquivo) {
+  const progressEl = document.getElementById('uploadProgress');
+  const barEl      = document.getElementById('uploadBar');
+  const statusEl   = document.getElementById('uploadStatus');
+  const pctEl      = document.getElementById('uploadPct');
+  const infoEl     = document.getElementById('infoPlanilha');
+
+  progressEl.classList.add('active');
+  infoEl.style.display = 'none';
+  barEl.style.width = '20%';
+  statusEl.textContent = 'Lendo arquivo no Drive...';
+  pctEl.textContent = '';
+
+  try {
+    barEl.style.width = '50%';
+    statusEl.textContent = 'Importando para planilha...';
+
+    const res = await jsonpRequest({
+      action:  'importarDaPasta',
+      fileId,
+      fonte:   importSource,
+      reset:   'false',
+    });
+
+    barEl.style.width  = '100%';
+    pctEl.textContent  = '✓';
+
+    if (!res || res.erro) {
+      statusEl.textContent = 'Erro!';
+      progressEl.style.setProperty('--bar-color', 'var(--red)');
+      setTimeout(() => { progressEl.classList.remove('active'); progressEl.style.removeProperty('--bar-color'); }, 4000);
+      const msg = res?.erro || 'Resposta inválida do servidor';
+      showToast('Erro: ' + msg, 'error');
+      infoEl.style.display = 'block';
+      infoEl.style.background = 'var(--red-bg)';
+      infoEl.style.borderColor = '#fecaca';
+      infoEl.style.color = 'var(--red)';
+      infoEl.textContent = '❌ ' + msg;
+      return;
+    }
+
+    statusEl.textContent = 'Concluído!';
+    setTimeout(() => progressEl.classList.remove('active'), 2000);
+
+    const inseridos = res.inseridos ?? 0;
+    const total     = res.total ?? 0;
+    infoEl.style.display = 'block';
+    infoEl.style.background = '';
+    infoEl.style.borderColor = '';
+    infoEl.style.color = '';
+    infoEl.textContent = `✓ ${inseridos} pedidos novos de "${res.arquivo || nomeArquivo}" (${total - inseridos} já existiam)`;
+
+    // Atualiza stats
+    document.getElementById('importStats').style.display = 'flex';
+    document.getElementById('statArquivos').textContent = '1';
+    document.getElementById('statMotivos').textContent  = res.inseridos ?? 0;
+
+    await verificarPedidosPlanilha();
+
+    document.getElementById('cardBusca').style.display = 'block';
+    document.getElementById('btnProximo').style.display = 'block';
+    setStep(2);
+    showToast(`✓ ${res.inseridos} pedidos importados!`, 'success');
+
+  } catch(e) {
+    progressEl.classList.remove('active');
+    showToast('Erro ao importar: ' + e.message, 'error');
   }
 }
 
