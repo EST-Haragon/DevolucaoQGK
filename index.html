@@ -796,7 +796,7 @@ function iniciarApp() {
   setTimeout(reenviarPendentes, 5000);
   // Verifica quantos pedidos há na planilha ao abrir
   verificarPedidosPlanilha();
-  document.getElementById('btnVerPedidos').style.display = 'block';
+  document.getElementById('btnVerPedidos')?.style && (document.getElementById('btnVerPedidos').style.display = 'block');
 }
 
 window.addEventListener('load', () => {
