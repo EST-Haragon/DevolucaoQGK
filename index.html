@@ -769,14 +769,14 @@ function iniciarApp() {
         fontes = meta.map(m => ({ ...m, rows: [] }));
         renderFontesList();
         atualizarBadgeCSV();
-        // Mostra aviso de reimportação necessária
-        const dz = document.getElementById('dropZone');
-        if (dz) {
-          const aviso = document.createElement('div');
-          aviso.id = 'avisoReimportar';
-          aviso.style.cssText = 'margin-top:10px;padding:10px 14px;background:var(--orange-bg);border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:var(--orange);font-weight:600;';
-          aviso.innerHTML = '⚠️ Reimporte os arquivos abaixo para continuar buscando (dados não persistem entre sessões)';
-          dz.parentNode.insertBefore(aviso, dz.nextSibling);
+        // Mostra aviso no card de importação
+        const infoEl = document.getElementById('infoPlanilha');
+        if (infoEl) {
+          infoEl.style.display = 'block';
+          infoEl.style.background = 'var(--orange-bg)';
+          infoEl.style.borderColor = '#fcd34d';
+          infoEl.style.color = 'var(--orange)';
+          infoEl.textContent = '⚠️ Os arquivos precisam ser reimportados da pasta do Drive';
         }
       }
     } catch(e) { fontes = []; }
@@ -791,11 +791,7 @@ function iniciarApp() {
   document.addEventListener('drop',      e => e.preventDefault());
   document.addEventListener('dragenter', e => e.preventDefault());
 
-  const dz = document.getElementById('dropZone');
-  dz.addEventListener('dragover',  e => { e.preventDefault(); e.stopPropagation(); dz.classList.add('drag-over'); });
-  dz.addEventListener('dragenter', e => { e.preventDefault(); e.stopPropagation(); dz.classList.add('drag-over'); });
-  dz.addEventListener('dragleave', e => { e.stopPropagation(); dz.classList.remove('drag-over'); });
-  dz.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag-over'); processarArquivos(Array.from(e.dataTransfer.files)); });
+  // dropZone removido — importação agora via Google Drive
   sincronizarHistorico();
   setTimeout(reenviarPendentes, 5000);
   // Verifica quantos pedidos há na planilha ao abrir
@@ -828,7 +824,7 @@ function setStep(n) {
 function setImportSource(src, el) {
   importSource = src;
   document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active')); el.classList.add('active');
-  document.getElementById('dropSub').textContent = src === 'ml' ? 'Painel de devoluções → Mercado Livre' : 'Painel de devoluções → Shopee';
+  // dropSub removido — fonte selecionada via tab-btn
 }
 
 function handleFileSelect(e) {
